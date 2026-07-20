@@ -1,0 +1,487 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/primary"
+    android:padding="8dp"
+    android:splitMotionEvents="true"
+    tools:context=".MainActivity">
+
+    <!-- Top Connection Card - RESTORED TO FULL WIDTH -->
+    <androidx.cardview.widget.CardView
+        android:id="@+id/statusCard"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_margin="4dp"
+        app:cardBackgroundColor="@color/card_bg"
+        app:cardCornerRadius="16dp"
+        app:cardElevation="4dp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="12dp">
+
+            <TextView
+                android:id="@+id/appTitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="KEMI语音键盘"
+                android:textColor="@color/white"
+                android:textSize="16sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/statusText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="状态: 正在初始化蓝牙..."
+                android:textColor="@color/accent"
+                android:textSize="13sp" />
+
+            <TextView
+                android:id="@+id/btNameText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="蓝牙设备名称是KBOARD-XXXX"
+                android:textColor="@color/text_secondary"
+                android:textSize="11sp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginTop="8dp"
+                android:gravity="center_vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="直投模式: "
+                    android:textColor="@color/text_primary"
+                    android:textSize="12sp"
+                    android:textStyle="bold"
+                    android:layout_marginEnd="8dp" />
+
+                <Button
+                    android:id="@+id/btnModePinyin"
+                    android:layout_width="0dp"
+                    android:layout_height="36dp"
+                    android:layout_weight="1"
+                    android:text="拼音"
+                    android:textColor="@color/white"
+                    android:textSize="11sp"
+                    android:insetTop="0dp"
+                    android:insetBottom="0dp"
+                    android:layout_marginEnd="4dp" />
+
+                <Button
+                    android:id="@+id/btnModeMac"
+                    android:layout_width="0dp"
+                    android:layout_height="36dp"
+                    android:layout_weight="1.2"
+                    android:text="Mac直投"
+                    android:textColor="@color/white"
+                    android:textSize="11sp"
+                    android:insetTop="0dp"
+                    android:insetBottom="0dp"
+                    android:layout_marginEnd="4dp" />
+
+                <Button
+                    android:id="@+id/btnModeWin"
+                    android:layout_width="0dp"
+                    android:layout_height="36dp"
+                    android:layout_weight="1.2"
+                    android:text="Win直投"
+                    android:textColor="@color/white"
+                    android:textSize="11sp"
+                    android:insetTop="0dp"
+                    android:insetBottom="0dp" />
+            </LinearLayout>
+
+            <!-- Hint Text -->
+            <TextView
+                android:id="@+id/hintText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:text="提示: 拼音模式已开启。请确保接收端已切换为中文拼音输入法。"
+                android:textColor="@color/text_secondary"
+                android:textSize="11sp" />
+
+            <!-- Mac Helper Buttons Left-Aligned -->
+            <LinearLayout
+                android:id="@+id/macButtonsLayout"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginTop="6dp"
+                android:visibility="gone">
+
+                <Button
+                    android:id="@+id/btnBypassMac"
+                    android:layout_width="wrap_content"
+                    android:layout_height="28dp"
+                    android:background="@drawable/button_mac_helper"
+                    android:text="一键跳过 Mac 键盘验证"
+                    android:textColor="@color/white"
+                    android:textSize="10sp"
+                    android:paddingLeft="12dp"
+                    android:paddingRight="12dp"
+                    android:insetTop="0dp"
+                    android:insetBottom="0dp"
+                    android:layout_marginEnd="8dp" />
+
+                <Button
+                    android:id="@+id/btnHowToSetUnicode"
+                    android:layout_width="wrap_content"
+                    android:layout_height="28dp"
+                    android:background="@drawable/button_mac_helper"
+                    android:text="如何设置 Unicode 16进制输入法"
+                    android:textColor="@color/white"
+                    android:textSize="10sp"
+                    android:paddingLeft="12dp"
+                    android:paddingRight="12dp"
+                    android:insetTop="0dp"
+                    android:insetBottom="0dp" />
+            </LinearLayout>
+        </LinearLayout>
+    </androidx.cardview.widget.CardView>
+
+    <!-- Main Split Columns Layout - Constraint below statusCard -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_marginTop="8dp"
+        android:orientation="horizontal"
+        android:weightSum="2"
+        android:splitMotionEvents="true"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/statusCard">
+
+        <!-- Left Column: Voice ASR Panel (50% width) -->
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:padding="6dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="语音识别文本 (自动发送)"
+                android:textColor="@color/text_secondary"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                android:layout_marginBottom="4dp" />
+
+            <androidx.cardview.widget.CardView
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                app:cardCornerRadius="8dp"
+                app:cardBackgroundColor="@color/card_bg"
+                app:cardElevation="2dp">
+
+                <ScrollView
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:padding="12dp">
+
+                    <TextView
+                        android:id="@+id/transcriptText"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="等待长按说话，ASR文本将在松开后以相应模式极速发送给接收端主机。"
+                        android:textColor="@color/text_primary"
+                        android:textSize="14sp"
+                        android:lineSpacingMultiplier="1.2" />
+                </ScrollView>
+            </androidx.cardview.widget.CardView>
+
+            <Button
+                android:id="@+id/micButton"
+                android:layout_width="match_parent"
+                android:layout_height="64dp"
+                android:layout_marginTop="12dp"
+                android:background="@drawable/button_mic_selector"
+                android:text="按住说话"
+                android:textColor="@color/white"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:insetTop="0dp"
+                android:insetBottom="0dp" />
+        </LinearLayout>
+
+        <!-- Right Column: Touchpad & Keyboard (50% width) -->
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:splitMotionEvents="true"
+            android:padding="6dp">
+
+            <!-- Container for Touchpad / Virtual Keyboard Overlay -->
+            <FrameLayout
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="3.2">
+
+                <!-- Touchpad View (Mouse sliding area) -->
+                <com.kboard.ui.TouchpadView
+                    android:id="@+id/touchpadView"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent" />
+
+                <!-- QWERTY Keyboard View (Overlay) -->
+                <LinearLayout
+                    android:id="@+id/qwertyKeyboardOverlay"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:orientation="vertical"
+                    android:background="@color/card_bg"
+                    android:padding="4dp"
+                    android:visibility="gone"
+                    android:weightSum="4">
+
+                    <!-- Row 1: TAB, Q W E R T Y U I O P -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="0dp"
+                        android:layout_weight="1"
+                        android:orientation="horizontal"
+                        android:gravity="center"
+                        android:layout_marginBottom="4dp">
+                        <Button android:id="@+id/btnTab" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1.2" android:text="TAB" style="@style/QwertyKeyStyle" />
+                        <Button android:id="@+id/btnQ" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:layout_marginStart="2dp" android:text="Q" style="@style/QwertyKeyStyle" />
+                        <Button android:id="@+id/btnW" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:layout_marginStart="2dp" android:text="W" style="@style/QwertyKeyStyle" />
+                        <Button android:id="@+id/btnE" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:layout_marginStart="2dp" android:text="E" style="@style/QwertyKeyStyle" />
+                        <Button android:id="@+id/btnR" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:layout_marginStart="2dp" android:text="R" style="@style/QwertyKeyStyle" />
+                        <Button android:id="@+id/btnT" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:layout_marginStart="2dp" android:text="T" style="@style/QwertyKeyStyle" />
+                        <Button android:id="@+id/btnY" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:layout_marginStart="2dp" android:text="Y" style="@style/QwertyKeyStyle" />
+                        <Button android:id="@+id/btnU" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:layout_marginStart="2dp" android:text="U" style="@style/QwertyKeyStyle" />
+                        <Button android:id="@+id/btnI" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:layout_marginStart="2dp" android:text="I" style="@style/QwertyKeyStyle" />
+                        <Button android:id="@+id/btnO" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:layout_marginStart="2dp" android:text="O" style="@style/QwertyKeyStyle" />
+                        <Button android:id="@+id/btnP" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:layout_marginStart="2dp" android:text="P" style="@style/QwertyKeyStyle" />
+                    </LinearLayout>
+
+                    <!-- Row 2: A S D F G H J K L -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="0dp"
+                        android:layout_weight="1"
+                        android:orientation="horizontal"
+                        android:gravity="center"
+                        android:layout_marginBottom="4dp">
+                        <View android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="0.5" />
+                        <Button android:id="@+id/btnA" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:text="A" style="@style/QwertyKeyStyle" />
+                        <Button android:id="@+id/btnS" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:layout_marginStart="2dp" android:text="S" style="@style/QwertyKeyStyle" />
+                        <Button android:id="@+id/btnD" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:layout_marginStart="2dp" android:text="D" style="@style/QwertyKeyStyle" />
+                        <Button android:id="@+id/btnF" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:layout_marginStart="2dp" android:text="F" style="@style/QwertyKeyStyle" />
+                        <Button android:id="@+id/btnG" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:layout_marginStart="2dp" android:text="G" style="@style/QwertyKeyStyle" />
+                        <Button android:id="@+id/btnH" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:layout_marginStart="2dp" android:text="H" style="@style/QwertyKeyStyle" />
+                        <Button android:id="@+id/btnJ" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:layout_marginStart="2dp" android:text="J" style="@style/QwertyKeyStyle" />
+                        <Button android:id="@+id/btnK" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:layout_marginStart="2dp" android:text="K" style="@style/QwertyKeyStyle" />
+                        <Button android:id="@+id/btnL" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:layout_marginStart="2dp" android:text="L" style="@style/QwertyKeyStyle" />
+                        <View android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="0.5" />
+                    </LinearLayout>
+
+                    <!-- Row 3: Z X C V B N M -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="0dp"
+                        android:layout_weight="1"
+                        android:orientation="horizontal"
+                        android:gravity="center"
+                        android:layout_marginBottom="4dp">
+                        <View android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1.5" />
+                        <Button android:id="@+id/btnZ" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:text="Z" style="@style/QwertyKeyStyle" />
+                        <Button android:id="@+id/btnX" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:layout_marginStart="2dp" android:text="X" style="@style/QwertyKeyStyle" />
+                        <Button android:id="@+id/btnC" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:layout_marginStart="2dp" android:text="C" style="@style/QwertyKeyStyle" />
+                        <Button android:id="@+id/btnV" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:layout_marginStart="2dp" android:text="V" style="@style/QwertyKeyStyle" />
+                        <Button android:id="@+id/btnB" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:layout_marginStart="2dp" android:text="B" style="@style/QwertyKeyStyle" />
+                        <Button android:id="@+id/btnN" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:layout_marginStart="2dp" android:text="N" style="@style/QwertyKeyStyle" />
+                        <Button android:id="@+id/btnM" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:layout_marginStart="2dp" android:text="M" style="@style/QwertyKeyStyle" />
+                        <View android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1.5" />
+                    </LinearLayout>
+
+                    <!-- Row 4: ALT, SPACE, DEL -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="0dp"
+                        android:layout_weight="1"
+                        android:orientation="horizontal"
+                        android:gravity="center">
+                        <View android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" />
+                        <Button android:id="@+id/btnAlt" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="2" android:text="ALT" style="@style/QwertyKeyStyle" />
+                        <Button android:id="@+id/btnSpace" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="5" android:layout_marginStart="4dp" android:text="SPACE" style="@style/QwertyKeyStyle" />
+                        <Button android:id="@+id/btnDel" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="2" android:layout_marginStart="4dp" android:text="DEL" style="@style/QwertyKeyStyle" />
+                        <View android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" />
+                    </LinearLayout>
+
+                </LinearLayout>
+            </FrameLayout>
+
+            <!-- Two-Row Keyboard Layout -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1.6"
+                android:layout_marginTop="12dp"
+                android:orientation="vertical"
+                android:splitMotionEvents="true">
+
+                <!-- Row 1: SHIFT, ESC, WIN, ..., BACK -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
+                    android:layout_weight="1"
+                    android:orientation="horizontal"
+                    android:splitMotionEvents="true"
+                    android:weightSum="5">
+
+                    <Button
+                        android:id="@+id/keyShift"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_weight="1"
+                        android:background="@drawable/key_modifier_selector"
+                        android:text="SHIFT"
+                        android:textColor="@color/white"
+                        android:textSize="12sp"
+                        android:textStyle="bold" />
+
+                    <Button
+                        android:id="@+id/keyEsc"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_weight="1"
+                        android:layout_marginStart="4dp"
+                        android:background="@drawable/key_modifier_selector"
+                        android:text="ESC"
+                        android:textColor="@color/white"
+                        android:textSize="12sp"
+                        android:textStyle="bold" />
+
+                    <Button
+                        android:id="@+id/keyWinCmd"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_weight="1"
+                        android:layout_marginStart="4dp"
+                        android:background="@drawable/key_modifier_selector"
+                        android:text="WIN"
+                        android:textColor="@color/white"
+                        android:textSize="12sp"
+                        android:textStyle="bold" />
+
+                    <Button
+                        android:id="@+id/keyToggleKeyboard"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_weight="1"
+                        android:layout_marginStart="4dp"
+                        android:background="@drawable/key_modifier_selector"
+                        android:text="..."
+                        android:textColor="@color/white"
+                        android:textSize="12sp"
+                        android:textStyle="bold" />
+
+                    <Button
+                        android:id="@+id/keyBack"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_weight="1"
+                        android:layout_marginStart="4dp"
+                        android:background="@drawable/key_back_selector"
+                        android:text="⌫"
+                        android:textColor="@color/white"
+                        android:textSize="16sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+
+                <!-- Row 2: CTRL, ALT, C, V, ENTER -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
+                    android:layout_weight="1"
+                    android:layout_marginTop="8dp"
+                    android:orientation="horizontal"
+                    android:splitMotionEvents="true"
+                    android:weightSum="5">
+
+                    <Button
+                        android:id="@+id/keyCtrl"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_weight="1"
+                        android:background="@drawable/key_modifier_selector"
+                        android:text="CTRL"
+                        android:textColor="@color/white"
+                        android:textSize="12sp"
+                        android:textStyle="bold" />
+
+                    <Button
+                        android:id="@+id/keyAlt"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_weight="1"
+                        android:layout_marginStart="4dp"
+                        android:background="@drawable/key_modifier_selector"
+                        android:text="ALT"
+                        android:textColor="@color/white"
+                        android:textSize="12sp"
+                        android:textStyle="bold" />
+
+                    <Button
+                        android:id="@+id/keyC"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_weight="1"
+                        android:layout_marginStart="4dp"
+                        android:background="@drawable/key_char_selector"
+                        android:text="C"
+                        android:textColor="@color/white"
+                        android:textSize="12sp"
+                        android:textStyle="bold" />
+
+                    <Button
+                        android:id="@+id/keyV"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_weight="1"
+                        android:layout_marginStart="4dp"
+                        android:background="@drawable/key_char_selector"
+                        android:text="V"
+                        android:textColor="@color/white"
+                        android:textSize="12sp"
+                        android:textStyle="bold" />
+
+                    <Button
+                        android:id="@+id/keyEnter"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_weight="1"
+                        android:layout_marginStart="4dp"
+                        android:background="@drawable/key_enter_selector"
+                        android:text="ENTER"
+                        android:textColor="@color/white"
+                        android:textSize="12sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+            </LinearLayout>
+        </LinearLayout>
+    </LinearLayout>
+</androidx.constraintlayout.widget.ConstraintLayout>

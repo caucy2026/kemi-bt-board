@@ -1,0 +1,53 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    
+    <!-- Deep Space Blue Squircle Background -->
+    <path
+        android:fillColor="#0A1128"
+        android:pathData="M20,10 L88,10 C93.5,10 98,14.5 98,20 L98,88 C98,93.5 93.5,98 88,98 L20,98 C14.5,98 10,93.5 10,88 L10,20 C10,14.5 14.5,10 20,10 Z" />
+
+    <!-- Neon Blue Sci-Fi Inner Border -->
+    <path
+        android:strokeColor="#0052D4"
+        android:strokeWidth="3"
+        android:pathData="M22,12 L86,12 C90.5,12 94,15.5 94,20 L94,84 C94,88.5 90.5,92 86,92 L22,92 C17.5,92 14,88.5 14,84 L14,20 C14,15.5 17.5,12 22,12 Z" />
+
+    <!-- Cyan Sci-Fi Glowing Corners -->
+    <path
+        android:strokeColor="#00F2FE"
+        android:strokeWidth="2.5"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M18,30 L18,18 L30,18 M90,78 L90,90 L78,90" />
+
+    <!-- Translucent Sci-Fi Keyboard Base -->
+    <path
+        android:fillColor="#15305B"
+        android:strokeColor="#00E5FF"
+        android:strokeWidth="2"
+        android:pathData="M24,46 C24,43 26.5,40.5 29.5,40.5 L78.5,40.5 C81.5,40.5 84,43 84,46 L84,78.5 C84,81.5 81.5,84 78.5,84 L29.5,84 C26.5,84 24,81.5 24,78.5 Z" />
+
+    <!-- Glowing Cyan Spacebar and Minimal Keys -->
+    <path
+        android:fillColor="#00E5FF"
+        android:pathData="M38,72 L70,72 C71,72 72,72.9 72,74 L72,76 C72,77.1 71,78 70,78 L38,78 C37,78 36,77.1 36,76 L36,74 C36,72.9 37,72 38,72 Z M29,48 L37,48 C38,48 39,48.9 39,50 L39,54 C39,55.1 38,56 37,56 L29,56 C28,56 27,55.1 27,54 L27,50 C27,48.9 28,48 29,48 Z M45,48 L53,48 C54,48 55,48.9 55,50 L55,54 C55,55.1 54,56 53,56 L45,56 C44,56 43,55.1 43,54 L43,50 C43,48.9 44,48 45,48 Z M61,48 L69,48 C70,48 71,48.9 71,50 L71,54 C71,55.1 70,56 69,56 L61,56 C60,56 59,55.1 59,54 L59,50 C59,48.9 60,48 61,48 Z M77,48 L85,48 C86,48 87,48.9 87,50 L87,54 C87,55.1 86,56 85,56 L77,56 C76,56 75,55.1 75,54 L75,50 C75,48.9 76,48 77,48 Z M29,60 L37,60 C38,60 39,60.9 39,62 L39,66 C39,67.1 38,68 37,68 L29,68 C28,68 27,67.1 27,66 L27,62 C27,60.9 28,60 29,60 Z M77,60 L85,60 C86,60 87,60.9 87,62 L87,66 C87,67.1 86,68 85,68 L77,68 C76,68 75,67.1 75,66 L75,62 C75,60.9 76,60 77,60 Z" />
+
+    <!-- Glowing Sci-Fi AI Sparkle (Outer Cyan Glow) -->
+    <path
+        android:fillColor="#00F2FE"
+        android:fillAlpha="0.4"
+        android:pathData="M74,12 C74,19.5 70,23.5 63,23.5 C70,23.5 74,27.5 74,35 C74,27.5 78,23.5 85,23.5 C78,23.5 74,19.5 74,12 Z" />
+
+    <!-- Glowing Sci-Fi AI Sparkle (Inner White Core) -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M74,15 C74,20 71.5,23.5 66.5,23.5 C71.5,23.5 74,27 74,32 C74,27 76.5,23.5 81.5,23.5 C76.5,23.5 74,20 74,15 Z" />
+
+    <!-- Small Glowing Sci-Fi AI Sparkle -->
+    <path
+        android:fillColor="#00E5FF"
+        android:pathData="M46,18 C46,21 44,23 40,23 C44,23 46,25 46,28 C46,25 48,23 52,23 C48,23 46,21 46,18 Z" />
+</vector>

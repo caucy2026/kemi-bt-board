@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">KEMI语音键盘</string>
+    <string name="bt_not_supported">当前设备不支持蓝牙</string>
+    <string name="bt_enable_request">请允许开启蓝牙以进行连接</string>
+</resources>

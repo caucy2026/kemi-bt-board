@@ -1,0 +1,835 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KEMI语音键盘 - 布局重构交互式预览</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=Noto+Sans+SC:wght@300;400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #0b0d19;
+            --card-bg: #131729;
+            --accent: #00ADB5;
+            --accent-glow: rgba(0, 173, 181, 0.3);
+            --text-primary: #EEEEEE;
+            --text-secondary: #94a3b8;
+            --white: #FFFFFF;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+        }
+
+        body {
+            background-color: var(--primary);
+            color: var(--text-primary);
+            font-family: 'Outfit', 'Noto Sans SC', sans-serif;
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* 顶部总控制台 */
+        .design-control-bar {
+            background: rgba(19, 23, 41, 0.85);
+            backdrop-filter: blur(20px);
+            border-bottom: 2px solid rgba(0, 173, 181, 0.2);
+            padding: 16px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 100;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+        }
+
+        .bar-title h1 {
+            font-size: 20px;
+            font-weight: 700;
+            background: linear-gradient(135deg, #00ADB5, #00f2fe);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .bar-title span {
+            font-size: 11px;
+            font-weight: 400;
+            color: #94a3b8;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 3px 8px;
+            border-radius: 4px;
+            -webkit-text-fill-color: #94a3b8;
+        }
+
+        .layout-switcher {
+            display: flex;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 4px;
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .switch-btn {
+            padding: 8px 18px;
+            border-radius: 8px;
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            font-weight: 600;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .switch-btn:hover {
+            color: var(--text-primary);
+        }
+
+        .switch-btn.active {
+            background: var(--accent);
+            color: var(--primary);
+            box-shadow: 0 4px 12px var(--accent-glow);
+        }
+
+        /* 预览核心容器 */
+        .workspace {
+            flex: 1;
+            display: flex;
+            padding: 24px;
+            gap: 24px;
+            height: calc(100vh - 72px);
+        }
+
+        /* 方案展示区域 */
+        .preview-container {
+            flex: 1.3;
+            background: #070911;
+            border-radius: 24px;
+            border: 1px solid rgba(255,255,255,0.03);
+            box-shadow: inset 0 4px 30px rgba(0,0,0,0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            position: relative;
+        }
+
+        /* 说明文档面板 */
+        .doc-panel {
+            flex: 0.7;
+            background: var(--card-bg);
+            border-radius: 24px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+        }
+
+        .doc-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--accent);
+            margin-bottom: 12px;
+            border-left: 4px solid var(--accent);
+            padding-left: 10px;
+        }
+
+        .doc-desc {
+            font-size: 13px;
+            color: var(--text-secondary);
+            line-height: 1.6;
+            margin-bottom: 20px;
+        }
+
+        .doc-features {
+            list-style: none;
+            margin-bottom: 24px;
+        }
+
+        .doc-features li {
+            font-size: 13px;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            line-height: 1.5;
+        }
+
+        .doc-features li::before {
+            content: "✦";
+            color: var(--accent);
+        }
+
+        .doc-badge {
+            background: rgba(0, 173, 181, 0.1);
+            border: 1px solid rgba(0, 173, 181, 0.2);
+            color: var(--accent);
+            padding: 10px 16px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            line-height: 1.6;
+        }
+
+        /* 模拟平板框架 */
+        .tablet-device {
+            width: 780px;
+            height: 480px;
+            background: #181b28;
+            border-radius: 36px;
+            padding: 16px;
+            box-shadow: 0 25px 60px rgba(0, 0, 0, 0.8), 0 0 0 4px rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255,255,255,0.06);
+            display: flex;
+            flex-direction: column;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        /* 模拟平板屏幕 */
+        .tablet-screen {
+            flex: 1;
+            background: var(--primary);
+            border-radius: 24px;
+            overflow: hidden;
+            display: flex;
+            position: relative;
+            padding: 8px;
+            gap: 8px;
+            box-shadow: inset 0 2px 8px rgba(0,0,0,0.8);
+        }
+
+        /* ======================== 界面组件样式 ======================== */
+
+        /* 顶部卡片 */
+        .status-card {
+            background: rgba(19, 23, 41, 0.9);
+            border-radius: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            padding: 10px 12px;
+            width: 100%;
+            transition: all 0.3s ease;
+        }
+
+        .status-card-compact {
+            padding: 6px 10px;
+        }
+
+        .status-row-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .status-info {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .status-info h2 {
+            font-size: 13px;
+            font-weight: 700;
+        }
+
+        .status-info p {
+            font-size: 9px;
+            color: var(--accent);
+        }
+
+        .mode-selector {
+            display: flex;
+            gap: 4px;
+        }
+
+        .mode-btn {
+            background: #1e293b;
+            color: #fff;
+            border: none;
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 9px;
+            font-weight: 600;
+        }
+
+        .mode-btn.active {
+            background: #0284C7;
+        }
+
+        .status-row-bottom {
+            margin-top: 6px;
+            display: flex;
+            gap: 8px;
+            align-items: flex-start;
+        }
+
+        .hint-text {
+            font-size: 8px;
+            color: var(--text-secondary);
+            flex: 1;
+            line-height: 1.4;
+        }
+
+        .mac-btn-group {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+            width: 120px;
+        }
+
+        .mac-helper-btn {
+            background: transparent;
+            border: 1px solid var(--accent);
+            color: var(--text-primary);
+            padding: 3px 6px;
+            border-radius: 4px;
+            font-size: 7px;
+            text-align: center;
+        }
+
+        /* 左右栏通用分栏 */
+        .column-left {
+            width: 50%;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            height: 100%;
+        }
+
+        .column-right {
+            width: 50%;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            height: 100%;
+        }
+
+        /* 语音显示区 */
+        .asr-card {
+            flex: 1;
+            background: rgba(19, 23, 41, 0.7);
+            border-radius: 12px;
+            border: 1px solid rgba(255,255,255,0.03);
+            padding: 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .asr-title {
+            font-size: 9px;
+            color: var(--text-secondary);
+            font-weight: 600;
+        }
+
+        .asr-box {
+            flex: 1;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 8px;
+            padding: 8px;
+            font-size: 11px;
+            color: var(--text-primary);
+            overflow-y: auto;
+            line-height: 1.4;
+        }
+
+        /* 麦克风按键 */
+        .mic-btn-pill {
+            height: 48px;
+            border-radius: 24px;
+            background: linear-gradient(135deg, #00ADB5, #008891);
+            color: white;
+            font-weight: 700;
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 10px rgba(0, 173, 181, 0.2);
+        }
+
+        /* 触摸板 */
+        .touchpad-area {
+            flex: 1;
+            background: rgba(0, 0, 0, 0.35);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        .touchpad-area::before {
+            content: "";
+            position: absolute;
+            top:0; left:0; right:0; bottom:0;
+            background-image: radial-gradient(rgba(255,255,255,0.015) 1.5px, transparent 1.5px);
+            background-size: 16px 16px;
+        }
+
+        .touchpad-label {
+            color: #3f4e66;
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 1.5px;
+        }
+
+        /* 按键排布 */
+        .key-row {
+            display: flex;
+            gap: 4px;
+            height: 38px;
+        }
+
+        .key-row-margin {
+            margin-top: 6px;
+        }
+
+        .mock-key {
+            flex: 1;
+            background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 9px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 0 #020617;
+        }
+
+        .mock-key-special {
+            background: radial-gradient(circle, #312e81 0%, #1e1b4b 100%);
+        }
+
+        .mock-key-accent {
+            background: radial-gradient(circle, #0f766e 0%, #115e59 100%);
+        }
+
+        /* ======================== 方案特定布局定义 ======================== */
+
+        /* 方案 A: 顶部卡片高度大幅压缩版 */
+        .layout-a-style {
+            flex-direction: column;
+        }
+
+        .layout-a-style .main-split {
+            flex: 1;
+            display: flex;
+            width: 100%;
+            gap: 8px;
+            margin-top: 8px;
+        }
+
+        /* 方案 B: 全设置堆叠至左侧版 */
+        .layout-b-style {
+            flex-direction: row;
+        }
+
+        .layout-b-style .column-left {
+            width: 45%;
+        }
+
+        .layout-b-style .column-right {
+            width: 55%;
+        }
+
+        .layout-b-style .status-card {
+            margin-bottom: 6px;
+        }
+
+        .layout-b-style .status-row-bottom {
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .layout-b-style .mac-btn-group {
+            width: 100%;
+            flex-direction: row;
+            gap: 4px;
+        }
+
+        .layout-b-style .mac-helper-btn {
+            flex: 1;
+        }
+
+        /* 方案 C: 平板经典上下排布（极佳比例） */
+        .layout-c-style {
+            flex-direction: column;
+        }
+
+        .layout-c-style .top-split {
+            flex: 1;
+            display: flex;
+            width: 100%;
+            gap: 8px;
+        }
+
+        .layout-c-style .bottom-keyboard-bar {
+            height: 120px;
+            width: 100%;
+            margin-top: 8px;
+            background: var(--card-bg);
+            border: 1px solid rgba(255,255,255,0.05);
+            border-radius: 16px;
+            padding: 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .layout-c-style .bottom-keyboard-row {
+            display: flex;
+            gap: 4px;
+            flex: 1;
+        }
+
+        .layout-c-style .bottom-key {
+            flex: 1;
+            background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+            border: 1px solid rgba(255,255,255,0.05);
+            border-radius: 6px;
+            font-size: 8px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #cbd5e1;
+        }
+
+        .layout-c-style .bottom-key-wide {
+            flex: 3;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 顶部设计控制栏 -->
+    <div class="design-control-bar">
+        <div class="bar-title">
+            <h1>KEMI 语音键盘 <span>布局方案评测</span></h1>
+        </div>
+        <div class="layout-switcher">
+            <button class="switch-btn active" onclick="switchLayout('A')">方案 A: 压缩顶部横幅</button>
+            <button class="switch-btn" onclick="switchLayout('B')">方案 B: 控件挪至左侧</button>
+            <button class="switch-btn" onclick="switchLayout('C')">方案 C: 上下经典分层</button>
+        </div>
+    </div>
+
+    <!-- 核心工作区 -->
+    <div class="workspace">
+        <!-- 左侧：模拟器展示 -->
+        <div class="preview-container">
+            <div id="deviceFrame" class="tablet-device">
+                <div id="screenContainer" class="tablet-screen layout-a-style">
+                    
+                    <!-- 动态渲染部分 (默认为方案 A) -->
+                    
+                </div>
+            </div>
+        </div>
+
+        <!-- 右侧：文字解析与反馈建议 -->
+        <div class="doc-panel">
+            <div id="panelTitle" class="doc-title">方案 A: 压缩顶部横幅</div>
+            <div id="panelDesc" class="doc-desc">
+                保留左右两列的基础框架，但是将原本宽大的顶部状态和设置卡片高度进行极限缩减。将说明文字和跳过验证按键左右横向排列，使其垂直方向仅占极小的面积。
+            </div>
+            
+            <div class="doc-title" style="font-size: 15px; margin-top: 10px;">布局特征：</div>
+            <ul id="panelFeatures" class="doc-features">
+                <li>**顶部横幅高度降低 50%**，为下方功能区腾出大量纵向空间。</li>
+                <li>**鼠标滑动区 (Touchpad) 比例优化**，通过调整下方底栏按键的高度占比，将滑动区锁定在接近 **4:3 的黄金比例**。</li>
+                <li>**界面紧凑度高**，保留传统左右控制习惯，视觉对称性好。</li>
+                <li>左右两栏可以独立工作，滑动区不阻挡左侧语音查看。</li>
+            </ul>
+
+            <div id="panelBadge" class="doc-badge">
+                💡 **比例评价**：完美解决了之前滑动区拉得太高导致手指滑动不协调的问题。4:3 比例符合人体工程学，滑动体验最为舒适自然。
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const layoutData = {
+            'A': {
+                title: '方案 A: 压缩顶部横幅',
+                desc: '保留左右分栏的基础框架，将顶部状态卡片进行极限垂直方向的压缩。提示文本和辅助按键横向对齐，使得在 Mac 直投模式下也仅占很小面积，下方鼠标触摸滑动区锁定在 4:3 黄金比例。',
+                features: [
+                    '**顶部状态栏重构**，高度直接裁切 50% 以上，Mac 控制按钮与文字左右对齐。',
+                    '**触摸板比例优化**，高度不再冗余，限制在符合手指划动惯性的 **4:3 比例**。',
+                    '**底栏按键维持 5 键对称设计**，ALT、TAB 完整收纳至双排快捷按键中。',
+                    '布局对称性极强，操作符合已有习惯，改动最小且效果极佳。'
+                ],
+                badge: '💡 **比例评价**：高度被顶部卡片截断后，触摸板呈现矮宽的 4:3 比例，滑动轨迹长且符合直觉，不会有纵向划不到头的紧绷感。',
+                html: `
+                    <!-- 1. 顶部压缩卡片 -->
+                    <div class="status-card status-card-compact">
+                        <div class="status-row-top">
+                            <div class="status-info">
+                                <h2>KEMI语音键盘 v1.0.3</h2>
+                                <p>状态: 等待主机连接 (KEMI-KB-72A2)</p>
+                            </div>
+                            <div class="mode-selector">
+                                <button class="mode-btn">拼音</button>
+                                <button class="mode-btn active">Mac直投</button>
+                                <button class="mode-btn">Win直投</button>
+                            </div>
+                        </div>
+                        <div class="status-row-bottom">
+                            <div class="hint-text">提示: Mac直投模式已开启。请确保Mac已切换至【Unicode十六进制】输入法 [U+]</div>
+                            <div class="mac-btn-group">
+                                <button class="mac-helper-btn">一键跳过Mac验证</button>
+                                <button class="mac-helper-btn">如何设置Unicode</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 2. 下方分栏 -->
+                    <div class="main-split">
+                        <!-- 左栏 -->
+                        <div class="column-left">
+                            <div class="asr-card">
+                                <div class="asr-title">语音识别文本 (自动发送)</div>
+                                <div class="asr-box">等待按住说话，松开后自动进行 Shift+Enter 换行直投。</div>
+                            </div>
+                            <div class="mic-btn-pill">按住说话</div>
+                        </div>
+
+                        <!-- 右栏 -->
+                        <div class="column-right">
+                            <div class="touchpad-area">
+                                <div class="touchpad-label">MOUSE PAD (4:3 黄金比例)</div>
+                            </div>
+                            <div class="key-row key-row-margin">
+                                <div class="mock-key mock-key-special">SHIFT</div>
+                                <div class="mock-key">ESC</div>
+                                <div class="mock-key">TAB</div>
+                                <div class="mock-key">...</div>
+                                <div class="mock-key mock-key-special">⌫</div>
+                            </div>
+                            <div class="key-row" style="margin-top: 4px;">
+                                <div class="mock-key mock-key-special">CTRL</div>
+                                <div class="mock-key">ALT</div>
+                                <div class="mock-key">C</div>
+                                <div class="mock-key">V</div>
+                                <div class="mock-key mock-key-accent">ENTER</div>
+                            </div>
+                        </div>
+                    </div>
+                `
+            },
+            'B': {
+                title: '方案 B: 控件挪至左侧',
+                desc: '完全清空右半侧的顶部区域。将所有的连接指示卡片、模式按钮、MAC跳过按钮与说明文字塞到左侧语音控制栏顶部。使得右侧的鼠标触摸板能直接触顶。',
+                features: [
+                    '**右侧极限纯净**，右半边没有状态栏卡片，划动面积在纵向上扩充至极值。',
+                    '**功能分区明确**，左边纯配置与文本，右边纯操作（划鼠与物理快捷键）。',
+                    '**高度需要控制**：为防止触摸板纵向太高，通常需要在代码或布局中设定 **maxHeight**，多余的顶部空白或下方按键需要合理留白或等比缩放。',
+                    '左侧卡片稍显紧凑，因为塞入了较多选项，但极度利于鼠标重度使用者。'
+                ],
+                badge: '⚠️ **比例警告**：如果触摸板直接拉满到最顶部，长宽比可能达到 16:9 甚至更高。此时在滑动时，需要手腕做较大幅度的纵向拉伸，长时间容易疲劳。因此必须做等比缩放限制。',
+                html: `
+                    <!-- 左右分栏直接贯穿顶部 -->
+                    <!-- 左栏 -->
+                    <div class="column-left" style="padding-top: 4px;">
+                        <!-- 状态卡片移入左栏顶部 -->
+                        <div class="status-card" style="margin-bottom: 4px;">
+                            <div class="status-row-top" style="flex-direction: column; align-items: flex-start; gap: 4px;">
+                                <div class="status-info">
+                                    <h2 style="font-size:12px;">KEMI语音键盘 v1.0.3</h2>
+                                    <p style="font-size:8px;">状态: 等待连接 (KEMI-KB-72A2)</p>
+                                </div>
+                                <div class="mode-selector" style="margin-top: 2px;">
+                                    <button class="mode-btn" style="padding:2px 6px; font-size:8px;">拼音</button>
+                                    <button class="mode-btn active" style="padding:2px 6px; font-size:8px;">Mac直投</button>
+                                    <button class="mode-btn" style="padding:2px 6px; font-size:8px;">Win直投</button>
+                                </div>
+                            </div>
+                            <div class="status-row-bottom" style="margin-top: 4px;">
+                                <div class="hint-text" style="font-size:7.5px;">提示: 请切换至Unicode十六进制输入法 [U+]</div>
+                            </div>
+                            <div class="mac-btn-group" style="width:100%; margin-top:4px; flex-direction:row; gap:2px;">
+                                <button class="mac-helper-btn" style="flex:1; padding:2px; font-size:6.5px;">一键跳过Mac</button>
+                                <button class="mac-helper-btn" style="flex:1; padding:2px; font-size:6.5px;">如何设置Unicode</button>
+                            </div>
+                        </div>
+
+                        <div class="asr-card" style="flex: 1;">
+                            <div class="asr-title">语音识别文本 (自动发送)</div>
+                            <div class="asr-box" style="font-size: 10px;">等待长按说话...</div>
+                        </div>
+                        <div class="mic-btn-pill" style="height: 44px; font-size:12px;">按住说话</div>
+                    </div>
+
+                    <!-- 右栏：触摸板直接触顶 -->
+                    <div class="column-right" style="padding-top: 4px;">
+                        <div class="touchpad-area" style="flex: 1; border-color: rgba(0, 173, 181, 0.3);">
+                            <div class="touchpad-label">MOUSE PAD (高度触顶拉伸)</div>
+                        </div>
+                        <div class="key-row key-row-margin">
+                            <div class="mock-key mock-key-special">SHIFT</div>
+                            <div class="mock-key">ESC</div>
+                            <div class="mock-key">TAB</div>
+                            <div class="mock-key">...</div>
+                            <div class="mock-key mock-key-special">⌫</div>
+                        </div>
+                        <div class="key-row" style="margin-top: 4px;">
+                            <div class="mock-key mock-key-special">CTRL</div>
+                            <div class="mock-key">ALT</div>
+                            <div class="mock-key">C</div>
+                            <div class="mock-key">V</div>
+                            <div class="mock-key mock-key-accent">ENTER</div>
+                        </div>
+                    </div>
+                `
+            },
+            'C': {
+                title: '方案 C: 上下经典分层 (首选)',
+                desc: '完全颠覆现有的两分栏布局，采用上下层级结构。上半部分放置状态指示、ASR文本区和 4:3 黄金比例鼠标触摸板；下半部分放置横跨整屏的实体虚拟物理小键盘区。',
+                features: [
+                    '**鼠标触摸板比例达到完美的 4:3 宽屏状态**，不仅符合人体工程学，视觉比例极度和谐。',
+                    '**底部键盘区域极度开阔**，键盘按键不再拥挤，更方便加入常用的空格、回车、ALT、TAB等。',
+                    '**多任务视觉线拉平**，眼睛看左边识别框、右手在右边划屏幕在同一高度上，完全不需要低头。',
+                    '点击 `...` 键可以直接一键将下半部分的键盘折叠起来，把下半截也变成扩展触摸板！'
+                ],
+                badge: '⭐️ **推荐星级**：★★★★★。由于平板屏幕宽大，上下布局是经典物理外设控制器（如很多专业调音台、遥控器）的常见设计，操作极其不易疲劳，比例无可挑剔。',
+                html: `
+                    <!-- 方案 C 整体上下结构 -->
+                    <div style="display: flex; flex-direction: column; width: 100%; height: 100%;">
+                        <!-- 上半截：ASR 与 触摸板 -->
+                        <div class="top-split">
+                            <!-- 左侧配置与 AS R -->
+                            <div class="column-left" style="width: 45%;">
+                                <div class="status-card" style="padding: 6px 8px;">
+                                    <div class="status-row-top" style="gap:2px;">
+                                        <div class="status-info">
+                                            <h2 style="font-size:11px;">KEMI语音键盘 v1.0.3</h2>
+                                            <p style="font-size:8px;">状态: 等待连接 (KEMI-KB-72A2)</p>
+                                        </div>
+                                        <div class="mode-selector">
+                                            <button class="mode-btn" style="padding:2px 4px; font-size:7.5px;">拼音</button>
+                                            <button class="mode-btn active" style="padding:2px 4px; font-size:7.5px;">Mac</button>
+                                            <button class="mode-btn" style="padding:2px 4px; font-size:7.5px;">Win</button>
+                                        </div>
+                                    </div>
+                                    <div class="status-row-bottom" style="margin-top: 3px; align-items: center;">
+                                        <div class="hint-text" style="font-size:7px;">请设置Unicode 16进制输入法 [U+]</div>
+                                    </div>
+                                </div>
+                                <div class="asr-card" style="flex: 1;">
+                                    <div class="asr-box" style="font-size: 10px; padding: 4px;">语音识别内容显示于此...</div>
+                                </div>
+                                <div class="mic-btn-pill" style="height: 36px; font-size:11px; margin-top:2px;">按住说话</div>
+                            </div>
+
+                            <!-- 右侧 4:3 触摸板 -->
+                            <div class="column-right" style="width: 55%;">
+                                <div class="touchpad-area" style="flex: 1; border-radius: 12px;">
+                                    <div class="touchpad-label">MOUSE PAD (4:3 黄金比例)</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 下半截：横跨全屏的小键盘 -->
+                        <div class="bottom-keyboard-bar">
+                            <div class="bottom-keyboard-row">
+                                <div class="bottom-key" style="background:#312e81;">SHIFT</div>
+                                <div class="bottom-key">ESC</div>
+                                <div class="bottom-key">TAB</div>
+                                <div class="bottom-key">Q</div>
+                                <div class="bottom-key">W</div>
+                                <div class="bottom-key">E</div>
+                                <div class="bottom-key">R</div>
+                                <div class="bottom-key">T</div>
+                                <div class="bottom-key">Y</div>
+                                <div class="bottom-key">U</div>
+                                <div class="bottom-key">I</div>
+                                <div class="bottom-key">O</div>
+                                <div class="bottom-key">P</div>
+                                <div class="bottom-key" style="background:#78350f;">⌫ 键</div>
+                            </div>
+                            <div class="bottom-keyboard-row">
+                                <div class="bottom-key" style="background:#312e81;">CTRL</div>
+                                <div class="bottom-key" style="background:#312e81;">ALT</div>
+                                <div class="bottom-key">A</div>
+                                <div class="bottom-key">S</div>
+                                <div class="bottom-key">D</div>
+                                <div class="bottom-key">F</div>
+                                <div class="bottom-key">G</div>
+                                <div class="bottom-key">H</div>
+                                <div class="bottom-key">J</div>
+                                <div class="bottom-key">K</div>
+                                <div class="bottom-key">L</div>
+                                <div class="bottom-key">C</div>
+                                <div class="bottom-key">V</div>
+                                <div class="bottom-key" style="background:#312e81;">... (切/叠)</div>
+                            </div>
+                            <div class="bottom-keyboard-row">
+                                <div class="bottom-key">Z</div>
+                                <div class="bottom-key">X</div>
+                                <div class="bottom-key">B</div>
+                                <div class="bottom-key">N</div>
+                                <div class="bottom-key">M</div>
+                                <div class="bottom-key bottom-key-wide" style="background:#0f172a;">SPACE 键</div>
+                                <div class="bottom-key bottom-key-wide" style="background:#0f766e;">ENTER 键</div>
+                            </div>
+                        </div>
+                    </div>
+                `
+            }
+        };
+
+        function switchLayout(key) {
+            // 更新按钮状态
+            document.querySelectorAll('.switch-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+
+            // 获取数据
+            const data = layoutData[key];
+
+            // 渲染文档描述
+            document.getElementById('panelTitle').innerText = data.title;
+            document.getElementById('panelDesc').innerText = data.desc;
+            
+            // 渲染特征
+            const featuresList = document.getElementById('panelFeatures');
+            featuresList.innerHTML = '';
+            data.features.forEach(feature => {
+                const li = document.createElement('li');
+                li.innerHTML = feature;
+                featuresList.appendChild(li);
+            });
+
+            // 渲染评价
+            document.getElementById('panelBadge').innerHTML = data.badge;
+
+            // 渲染平板屏幕
+            const container = document.getElementById('screenContainer');
+            container.innerHTML = data.html;
+            
+            // 更新平板框架类名以应用不同的分栏比例样式
+            container.className = 'tablet-screen';
+            if (key === 'A') {
+                container.classList.add('layout-a-style');
+            } else if (key === 'B') {
+                container.classList.add('layout-b-style');
+            } else if (key === 'C') {
+                container.classList.add('layout-c-style');
+            }
+        }
+
+        // 初始化加载方案 A
+        switchLayout('A');
+    </script>
+</body>
+</html>

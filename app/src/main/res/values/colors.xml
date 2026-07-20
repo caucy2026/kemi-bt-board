@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="primary">#121212</color>
+    <color name="primary_dark">#080808</color>
+    <color name="accent">#00ADB5</color>
+    <color name="card_bg">#1E1E1E</color>
+    <color name="touchpad_bg">#252525</color>
+    <color name="touchpad_stroke">#393E46</color>
+    <color name="text_primary">#EEEEEE</color>
+    <color name="text_secondary">#B2B2B2</color>
+    <color name="white">#FFFFFF</color>
+    <color name="black">#000000</color>
+    <color name="ic_launcher_background">#121212</color>
+
+    <!-- Key & Voice active/inactive neon colors -->
+    <color name="shift_active">#8B5CF6</color>
+    <color name="shift_inactive">#2D1E4D</color>
+    <color name="back_active">#D97706</color>
+    <color name="back_inactive">#4D321E</color>
+    <color name="enter_active">#0D9488</color>
+    <color name="enter_inactive">#1E4D48</color>
+    <color name="voice_active">#0284C7</color>
+    <color name="voice_inactive">#1E293B</color>
+</resources>
