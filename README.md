@@ -1,6 +1,6 @@
-# KEMI 语音智能键盘 (kboard)
+# KEMI 语音智能键盘 (kemi-bt-board)
 
-**KEMI 语音智能键盘 (kboard)** 是一款运行在 Android 设备上的蓝牙外设模拟工具。它通过 Android 系统的蓝牙 HID (Human Interface Device) 协议，将 Android 设备直接模拟为**标准的物理蓝牙键盘和鼠标触摸板**。
+**KEMI 语音智能键盘 (kemi-bt-board)** 是一款运行在 Android 设备上的蓝牙外设模拟工具。它通过 Android 系统的蓝牙 HID (Human Interface Device) 协议，将 Android 设备直接模拟为**标准的物理蓝牙键盘和鼠标触摸板**。
 
 项目的核心价值在于：**在接收端主机（如 Mac, Windows）不需要安装任何额外的接收软件或 Agent 的情况下，利用 Android 端的高精准本地语音识别（ASR）直接极速向主机直投输入中文字符。**
 

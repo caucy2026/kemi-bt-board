@@ -14,5 +14,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "kboard"
+rootProject.name = "kemi-bt-board"
 include(":app")
