@@ -162,6 +162,9 @@ class BluetoothHidManager(private val context: Context, var listener: HidStateLi
         val hid = hidDevice ?: return
         if (isAppRegistered) return
 
+        // Set local device class to Keyboard/Mouse Peripheral (0x0025C0)
+        setLocalBluetoothClassToKeyboardMouse()
+
         // Clean up any orphaned registration from previous runs
         try {
             hid.unregisterApp()
@@ -201,6 +204,9 @@ class BluetoothHidManager(private val context: Context, var listener: HidStateLi
                 listener?.onLog("Connection State Changed: device = ${device?.address}, state = ${getStateString(state)}")
                 if (state == BluetoothProfile.STATE_CONNECTED) {
                     connectedDevice = device
+                    if (device != null) {
+                        disableAudioProfilesForDevice(device)
+                    }
                     device?.address?.let { address ->
                         val prefs = context.getSharedPreferences("kboard_prefs", Context.MODE_PRIVATE)
                         prefs.edit().putString("last_connected_device", address).apply()
@@ -247,6 +253,7 @@ class BluetoothHidManager(private val context: Context, var listener: HidStateLi
         try {
             val device = adapter.getRemoteDevice(lastAddress)
             if (device.bondState == BluetoothDevice.BOND_BONDED) {
+                disableAudioProfilesForDevice(device)
                 listener?.onLog("Auto-connecting to paired host: ${device.name ?: device.address}...")
                 executor.execute {
                     try {
@@ -268,6 +275,80 @@ class BluetoothHidManager(private val context: Context, var listener: HidStateLi
     }
 
     // Reconnect loop methods removed from BluetoothHidManager and moved to MainActivity (foreground lifecycle-bound)
+
+    private fun setLocalBluetoothClassToKeyboardMouse() {
+        val adapter = bluetoothAdapter ?: return
+        try {
+            // Class value for Keyboard/Mouse Combo (Peripheral)
+            val peripheralClassVal = 0x0025C0
+            
+            // Create BluetoothClass instance via reflection
+            val bluetoothClassClass = Class.forName("android.bluetooth.BluetoothClass")
+            val constructor = bluetoothClassClass.getDeclaredConstructor(Int::class.javaPrimitiveType)
+            constructor.isAccessible = true
+            val bluetoothClassInstance = constructor.newInstance(peripheralClassVal)
+            
+            // Invoke setBluetoothClass on BluetoothAdapter
+            val setBluetoothClassMethod = adapter.javaClass.getMethod("setBluetoothClass", bluetoothClassClass)
+            val success = setBluetoothClassMethod.invoke(adapter, bluetoothClassInstance) as Boolean
+            Log.d(TAG, "setBluetoothClass to Keyboard/Mouse (0x0025C0) returned: $success")
+            listener?.onLog("Set Bluetooth Class to Keyboard/Mouse: $success")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to set Bluetooth Class via reflection", e)
+            listener?.onLog("Failed to set Bluetooth Class: ${e.message}")
+        }
+    }
+
+    private fun disableAudioProfilesForDevice(device: BluetoothDevice) {
+        val adapter = bluetoothAdapter ?: return
+        val profilesToDisable = intArrayOf(
+            2,  // BluetoothProfile.A2DP (Audio Source / Music)
+            11, // BluetoothProfile.A2DP_SINK (A2DP Audio Receiver)
+            1,  // BluetoothProfile.HEADSET (HFP / Phone Audio)
+            16  // BluetoothProfile.HEADSET_CLIENT (HFP Client Receiver)
+        )
+        for (profileId in profilesToDisable) {
+            try {
+                adapter.getProfileProxy(context, object : BluetoothProfile.ServiceListener {
+                    override fun onServiceConnected(profile: Int, proxy: BluetoothProfile) {
+                        try {
+                            // 1. Actively disconnect the audio connection to the Mac
+                            try {
+                                val disconnectMethod = proxy.javaClass.getMethod("disconnect", BluetoothDevice::class.java)
+                                disconnectMethod.invoke(proxy, device)
+                                Log.d(TAG, "AudioProfile: Active disconnect called on profile $profile for ${device.address}")
+                            } catch (e: Exception) {
+                                // ignore
+                            }
+                            
+                            // 2. Set priority/connection policy to Off/Forbidden (0) to permanently block auto-reconnection of audio
+                            try {
+                                val setConnectionPolicy = proxy.javaClass.getMethod("setConnectionPolicy", BluetoothDevice::class.java, Int::class.javaPrimitiveType)
+                                setConnectionPolicy.invoke(proxy, device, 0) // CONNECTION_POLICY_FORBIDDEN = 0
+                                Log.d(TAG, "AudioProfile: setConnectionPolicy(device, 0) succeeded for profile $profile")
+                            } catch (ex: Exception) {
+                                try {
+                                    val setPriority = proxy.javaClass.getMethod("setPriority", BluetoothDevice::class.java, Int::class.javaPrimitiveType)
+                                    setPriority.invoke(proxy, device, 0) // PRIORITY_OFF = 0
+                                    Log.d(TAG, "AudioProfile: setPriority(device, 0) succeeded for profile $profile")
+                                } catch (e: Exception) {
+                                    Log.e(TAG, "AudioProfile: Failed to disable profile $profile connection", e)
+                                }
+                            }
+                        } catch (e: Exception) {
+                            Log.e(TAG, "AudioProfile: Error in service listener for profile $profile", e)
+                        } finally {
+                            adapter.closeProfileProxy(profile, proxy)
+                        }
+                    }
+                    
+                    override fun onServiceDisconnected(profile: Int) {}
+                }, profileId)
+            } catch (e: Exception) {
+                Log.e(TAG, "Error obtaining profile proxy for $profileId", e)
+            }
+        }
+    }
 
     private fun getStateString(state: Int): String {
         return when (state) {
