@@ -191,9 +191,7 @@ class BluetoothHidManager(private val context: Context, var listener: HidStateLi
                 listener?.onLog("App Status Changed: registered = $registered")
                 listener?.onAppRegistered(registered)
                 if (registered) {
-                    if (currentInputMode != MODE_MAC) {
-                        autoReconnectToLastDevice()
-                    }
+                    autoReconnectToLastDevice()
                 }
             }
 
