@@ -1,0 +1,19 @@
+<lint-module
+    format="1"
+    dir="D:\work\ai_code\kemi-bt-board\xunfei-auth-lib"
+    name=":xunfei-auth-lib"
+    type="LIBRARY"
+    maven="kemi-bt-board:xunfei-auth-lib:"
+    agpVersion="8.2.0"
+    buildFolder="build"
+    bootClassPath="D:\work\ai_code\tools\android-sdk\platforms\android-34\android.jar;D:\work\ai_code\tools\android-sdk\build-tools\34.0.0\core-lambda-stubs.jar"
+    javaSourceLevel="17"
+    compileTarget="android-34"
+    neverShrinking="true">
+  <lintOptions
+      abortOnError="true"
+      absolutePaths="true"
+      checkReleaseBuilds="true"
+      explainIssues="true"/>
+  <variant name="release"/>
+</lint-module>

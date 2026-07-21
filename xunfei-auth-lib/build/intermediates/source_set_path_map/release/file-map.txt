@@ -1,0 +1,7 @@
+com.kboard.asr.auth.xunfei-auth-lib-pngs-0 D:\work\ai_code\kemi-bt-board\xunfei-auth-lib\build\generated\res\pngs\release
+com.kboard.asr.auth.xunfei-auth-lib-resValues-1 D:\work\ai_code\kemi-bt-board\xunfei-auth-lib\build\generated\res\resValues\release
+com.kboard.asr.auth.xunfei-auth-lib-mergeReleaseResources-2 D:\work\ai_code\kemi-bt-board\xunfei-auth-lib\build\intermediates\incremental\release\mergeReleaseResources\merged.dir
+com.kboard.asr.auth.xunfei-auth-lib-mergeReleaseResources-3 D:\work\ai_code\kemi-bt-board\xunfei-auth-lib\build\intermediates\incremental\release\mergeReleaseResources\stripped.dir
+com.kboard.asr.auth.xunfei-auth-lib-merged_res-4 D:\work\ai_code\kemi-bt-board\xunfei-auth-lib\build\intermediates\merged_res\release
+com.kboard.asr.auth.xunfei-auth-lib-main-5 D:\work\ai_code\kemi-bt-board\xunfei-auth-lib\src\main\res
+com.kboard.asr.auth.xunfei-auth-lib-release-6 D:\work\ai_code\kemi-bt-board\xunfei-auth-lib\src\release\res

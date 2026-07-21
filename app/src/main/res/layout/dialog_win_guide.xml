@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="320dp"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="@drawable/dialog_glass_bg"
+    android:padding="16dp"
+    android:layout_gravity="center">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Windows 电脑注册表配置指南"
+        android:textColor="#00ADB5"
+        android:textSize="15sp"
+        android:textStyle="bold"
+        android:gravity="center" />
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="#2E3A4E"
+        android:layout_marginTop="8dp"
+        android:layout_marginBottom="8dp" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="1. 按【Win + R】键打开运行，输入 regedit 打开注册表。\n\n2. 导航至以下路径：\n   HKEY_CURRENT_USER\\Control Panel\\Input Method\n\n3. 在右侧空白处右键 -> 新建 -> 【字符串值】，并命名为：EnableHexNumpad\n\n4. 双击 EnableHexNumpad，将数值数据设置为【1】并确定。\n\n5. 【特别注意】设置完成后，必须注销当前用户重新登录，或者重启电脑才能生效！\n\n6. 提示：配置生效后即可开始极速直投中文。"
+        android:textColor="#EEEEEE"
+        android:textSize="12sp"
+        android:lineSpacingMultiplier="1.15" />
+
+    <Button
+        android:id="@+id/btnWinGuideClose"
+        android:layout_width="match_parent"
+        android:layout_height="36dp"
+        android:layout_marginTop="12dp"
+        android:background="@drawable/button_mac_helper"
+        android:text="我明白了"
+        android:textColor="#FFFFFF"
+        android:textSize="12sp"
+        android:textStyle="bold"
+        android:insetTop="0dp"
+        android:insetBottom="0dp" />
+
+</LinearLayout>

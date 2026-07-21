@@ -58,6 +58,12 @@ class MainActivity : AppCompatActivity(), BluetoothHidManager.HidStateListener, 
     private lateinit var macButtonsLayout: android.widget.LinearLayout
     private lateinit var btnBypassMac: Button
     private lateinit var btnHowToSetUnicode: Button
+    private lateinit var winButtonsLayout: android.widget.LinearLayout
+    private lateinit var btnHowToSetWinUnicode: Button
+    private lateinit var btnGlobalKeyboard: Button
+    private lateinit var globalKeyboardOverlay: android.widget.LinearLayout
+    private lateinit var globalKeyboardTitle: TextView
+    private lateinit var btnGlobalKeyboardClose: Button
     private lateinit var qwertyKeyboardOverlay: android.widget.LinearLayout
     private var currentInputMode = BluetoothHidManager.MODE_MAC
     private var activeModifiers: Byte = 0
@@ -66,6 +72,13 @@ class MainActivity : AppCompatActivity(), BluetoothHidManager.HidStateListener, 
 
     private var btService: BluetoothHidService? = null
     private var isBound = false
+
+    // Foreground-bound reconnection logic variables
+    private val reconnectHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private var reconnectRunnable: Runnable? = null
+    private var isResumedState = false
+    private var lastWakeReconnectTime = 0L
+    private var isManualDisconnect = false
 
     private val serviceConnection = object : android.content.ServiceConnection {
         override fun onServiceConnected(name: android.content.ComponentName?, service: IBinder?) {
@@ -84,6 +97,7 @@ class MainActivity : AppCompatActivity(), BluetoothHidManager.HidStateListener, 
                     statusText.text = "状态: 等待主机连接"
                 }
             }
+            startReconnectLoop()
         }
 
         override fun onServiceDisconnected(name: android.content.ComponentName?) {
@@ -113,6 +127,10 @@ class MainActivity : AppCompatActivity(), BluetoothHidManager.HidStateListener, 
         transcriptText = findViewById(R.id.transcriptText)
         micButton = findViewById(R.id.micButton)
         touchpadView = findViewById(R.id.touchpadView)
+        touchpadView.setOnTouchListener { _, event ->
+            triggerWakeReconnectIfNeeded()
+            false
+        }
 
         keyCtrl = findViewById(R.id.keyCtrl)
         keyEsc = findViewById(R.id.keyEsc)
@@ -133,6 +151,12 @@ class MainActivity : AppCompatActivity(), BluetoothHidManager.HidStateListener, 
         macButtonsLayout = findViewById(R.id.macButtonsLayout)
         btnBypassMac = findViewById(R.id.btnBypassMac)
         btnHowToSetUnicode = findViewById(R.id.btnHowToSetUnicode)
+        winButtonsLayout = findViewById(R.id.winButtonsLayout)
+        btnHowToSetWinUnicode = findViewById(R.id.btnHowToSetWinUnicode)
+        btnGlobalKeyboard = findViewById(R.id.btnGlobalKeyboard)
+        globalKeyboardOverlay = findViewById(R.id.globalKeyboardOverlay)
+        globalKeyboardTitle = findViewById(R.id.globalKeyboardTitle)
+        btnGlobalKeyboardClose = findViewById(R.id.btnGlobalKeyboardClose)
 
         val appTitle = findViewById<TextView>(R.id.appTitle)
         try {
@@ -271,6 +295,8 @@ class MainActivity : AppCompatActivity(), BluetoothHidManager.HidStateListener, 
             }
         }
         setupMicButton()
+        setupInputModeButtons()
+        setupGlobalKeyboard()
     }
 
     private fun applyJustWorksPairing() {
@@ -328,6 +354,14 @@ class MainActivity : AppCompatActivity(), BluetoothHidManager.HidStateListener, 
             }
             btService?.hidManager?.currentInputMode = currentInputMode
             updateInputModeUI(currentInputMode)
+            if (currentInputMode == BluetoothHidManager.MODE_MAC) {
+                startReconnectLoop()
+            } else {
+                stopReconnectLoop()
+                if (btService?.hidManager?.connectedDevice == null) {
+                    btService?.hidManager?.autoReconnectToLastDevice()
+                }
+            }
 
             // Save input mode to SharedPreferences
             val prefs = getSharedPreferences("kboard_prefs", android.content.Context.MODE_PRIVATE)
@@ -346,6 +380,25 @@ class MainActivity : AppCompatActivity(), BluetoothHidManager.HidStateListener, 
             showMacUnicodeGuideDialog()
         }
 
+        btnHowToSetWinUnicode.setOnClickListener {
+            showWinUnicodeGuideDialog()
+        }
+
+        val btnClearConnections: Button = findViewById(R.id.btnClearConnections)
+        btnClearConnections.setOnClickListener {
+            androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle("确认清除连接？")
+                .setMessage("这将会断开当前连接，清除配对记录，并重新使平板蓝牙处于可发现状态。")
+                .setPositiveButton("确定") { _, _ ->
+                    isManualDisconnect = true
+                    stopReconnectLoop()
+                    btService?.hidManager?.clearAllPairsAndDisconnect()
+                    Toast.makeText(this, "连接与配对已清空，设备现在可被重新发现", Toast.LENGTH_SHORT).show()
+                }
+                .setNegativeButton("取消", null)
+                .show()
+        }
+
         // Initialize UI with saved mode
         updateInputModeUI(currentInputMode)
     }
@@ -358,8 +411,13 @@ class MainActivity : AppCompatActivity(), BluetoothHidManager.HidStateListener, 
         btnModeMac.setBackgroundColor(if (mode == BluetoothHidManager.MODE_MAC) activeColor else inactiveColor)
         btnModeWin.setBackgroundColor(if (mode == BluetoothHidManager.MODE_WIN) activeColor else inactiveColor)
 
-        // Set visibility of bypass Mac buttons layout
+        // Set visibility of bypass Mac and Win buttons layout
         macButtonsLayout.visibility = if (mode == BluetoothHidManager.MODE_MAC) android.view.View.VISIBLE else android.view.View.GONE
+        winButtonsLayout.visibility = if (mode == BluetoothHidManager.MODE_WIN) android.view.View.VISIBLE else android.view.View.GONE
+
+        if (::globalKeyboardOverlay.isInitialized) {
+            updateGlobalKeyboardLabels(mode)
+        }
 
         when (mode) {
             BluetoothHidManager.MODE_PINYIN -> {
@@ -389,8 +447,17 @@ class MainActivity : AppCompatActivity(), BluetoothHidManager.HidStateListener, 
         
         networkExecutor.execute {
             try {
-                // Step 1: Get/apply credentials (cached if already fetched)
-                val creds = cachedCredentials ?: credentialProvider.applyCredentials(wifiMacAddress)
+                // Step 1: Get/apply credentials (memory cache -> local cache -> server)
+                var creds = cachedCredentials ?: getLocalCredentials()
+                if (creds == null) {
+                    Log.d(TAG, "No cached credentials found, requesting from server...")
+                    val fresh = credentialProvider.applyCredentials(wifiMacAddress)
+                    if (fresh != null) {
+                        saveLocalCredentials(fresh)
+                        creds = fresh
+                    }
+                }
+                
                 if (creds == null) {
                     runOnUiThread {
                         transcriptText.text = "错误: 无法获取讯飞 ASR 凭证"
@@ -401,7 +468,27 @@ class MainActivity : AppCompatActivity(), BluetoothHidManager.HidStateListener, 
                 cachedCredentials = creds
 
                 // Step 2: Complete session authentication
-                val authSuccess = credentialProvider.authenticate(wifiMacAddress, creds.token)
+                var authSuccess = credentialProvider.authenticate(wifiMacAddress, creds.token)
+                if (!authSuccess) {
+                    Log.w(TAG, "Cached token authentication failed. Clearing cache and retrying...")
+                    runOnUiThread {
+                        transcriptText.text = "提示: 本地密钥已过期，正在重新向云端申请新密钥..."
+                    }
+                    clearLocalCredentials()
+                    cachedCredentials = null
+                    
+                    val fresh = credentialProvider.applyCredentials(wifiMacAddress)
+                    if (fresh != null) {
+                        saveLocalCredentials(fresh)
+                        cachedCredentials = fresh
+                        creds = fresh
+                        runOnUiThread {
+                            transcriptText.text = "提示: 密钥已重新拉取，正在鉴权重新连接..."
+                        }
+                        authSuccess = credentialProvider.authenticate(wifiMacAddress, creds.token)
+                    }
+                }
+
                 if (!authSuccess) {
                     runOnUiThread {
                         transcriptText.text = "错误: 讯飞 ASR 鉴权失败"
@@ -425,6 +512,7 @@ class MainActivity : AppCompatActivity(), BluetoothHidManager.HidStateListener, 
     }
 
     private fun sendKeyboardState() {
+        triggerWakeReconnectIfNeeded()
         val keycodesArray = pressedKeycodes.toByteArray()
         btService?.hidManager?.sendKeyboardReport(activeModifiers, keycodesArray)
         Log.d(TAG, "Sent keyboard report: modifiers=$activeModifiers, keys=${keycodesArray.contentToString()}")
@@ -706,12 +794,14 @@ class MainActivity : AppCompatActivity(), BluetoothHidManager.HidStateListener, 
             when (state) {
                 BluetoothProfile.STATE_CONNECTED -> {
                     statusText.text = "状态: 已连接至主机 [${device?.name ?: device?.address}]"
+                    stopReconnectLoop()
                 }
                 BluetoothProfile.STATE_CONNECTING -> {
                     statusText.text = "状态: 正在连接..."
                 }
                 BluetoothProfile.STATE_DISCONNECTED -> {
                     statusText.text = "状态: 等待主机连接"
+                    startReconnectLoop()
                 }
                 BluetoothProfile.STATE_DISCONNECTING -> {
                     statusText.text = "状态: 正在断开..."
@@ -784,6 +874,7 @@ class MainActivity : AppCompatActivity(), BluetoothHidManager.HidStateListener, 
             asrClient = null
             val textToSend = latestSessionText
             if (textToSend.isNotEmpty()) {
+                triggerWakeReconnectIfNeeded()
                 if (currentInputMode == BluetoothHidManager.MODE_PINYIN) {
                     val translated = KeycodeTranslator.translateText(textToSend)
                     Log.d(TAG, "Sending final ASR text (Pinyin): '$textToSend', Translated: '$translated'")
@@ -819,7 +910,416 @@ class MainActivity : AppCompatActivity(), BluetoothHidManager.HidStateListener, 
         dialog.show()
     }
 
+    private fun showWinUnicodeGuideDialog() {
+        val dialog = android.app.Dialog(this)
+        dialog.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE)
+        dialog.setContentView(R.layout.dialog_win_guide)
+        
+        // Set translucent/transparent background
+        dialog.window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT))
+        
+        val closeBtn = dialog.findViewById<Button>(R.id.btnWinGuideClose)
+        closeBtn.setOnClickListener {
+            dialog.dismiss()
+        }
+        
+        dialog.window?.setLayout(
+            (320 * resources.displayMetrics.density).toInt(),
+            android.view.ViewGroup.LayoutParams.WRAP_CONTENT
+        )
+        dialog.show()
+    }
+
+    private fun getLocalCredentials(): XunfeiCredentialProvider.Credentials? {
+        val prefs = getSharedPreferences("xunfei_prefs", android.content.Context.MODE_PRIVATE)
+        val appId = prefs.getString("app_id", null)
+        val apiKey = prefs.getString("api_key", null)
+        val token = prefs.getString("token", null)
+        if (appId != null && apiKey != null && token != null && appId.isNotEmpty() && apiKey.isNotEmpty() && token.isNotEmpty()) {
+            return XunfeiCredentialProvider.Credentials(token, appId, apiKey)
+        }
+        return null
+    }
+
+    private fun saveLocalCredentials(creds: XunfeiCredentialProvider.Credentials) {
+        val prefs = getSharedPreferences("xunfei_prefs", android.content.Context.MODE_PRIVATE)
+        prefs.edit().apply {
+            putString("app_id", creds.appId)
+            putString("api_key", creds.apiKey)
+            putString("token", creds.token)
+            apply()
+        }
+    }
+
+    private fun clearLocalCredentials() {
+        val prefs = getSharedPreferences("xunfei_prefs", android.content.Context.MODE_PRIVATE)
+        prefs.edit().clear().apply()
+    }
+
+    private fun updateGlobalKeyboardLabels(mode: Int) {
+        if (mode == BluetoothHidManager.MODE_MAC) {
+            globalKeyboardTitle.text = "全局键盘 - 标准 Mac 苹果键盘布局"
+            findViewById<Button>(R.id.btnGTab)?.text = "⇥ Tab"
+            findViewById<Button>(R.id.btnGCaps)?.text = "⇪ Caps"
+            findViewById<Button>(R.id.btnGLShift)?.text = "⇧ Shift"
+            findViewById<Button>(R.id.btnGRShift)?.text = "⇧ Shift"
+            findViewById<Button>(R.id.btnGEnter)?.text = "↩ Enter"
+            findViewById<Button>(R.id.btnGCtrlL)?.text = "⌃ Ctrl"
+            findViewById<Button>(R.id.btnGCtrlR)?.text = "⌃ Ctrl"
+            findViewById<Button>(R.id.btnGOptL)?.text = "⌥ Opt"
+            findViewById<Button>(R.id.btnGCmdL)?.text = "⌘ Cmd"
+            findViewById<Button>(R.id.btnGCmdR)?.text = "⌘ Cmd"
+            findViewById<Button>(R.id.btnGOptR)?.text = "⌥ Opt"
+        } else {
+            globalKeyboardTitle.text = "全局键盘 - 标准 Windows 键盘布局"
+            findViewById<Button>(R.id.btnGTab)?.text = "Tab"
+            findViewById<Button>(R.id.btnGCaps)?.text = "Caps"
+            findViewById<Button>(R.id.btnGLShift)?.text = "Shift"
+            findViewById<Button>(R.id.btnGRShift)?.text = "Shift"
+            findViewById<Button>(R.id.btnGEnter)?.text = "Enter"
+            findViewById<Button>(R.id.btnGCtrlL)?.text = "Ctrl"
+            findViewById<Button>(R.id.btnGCtrlR)?.text = "Ctrl"
+            findViewById<Button>(R.id.btnGOptL)?.text = "⊞ Win"
+            findViewById<Button>(R.id.btnGCmdL)?.text = "Alt"
+            findViewById<Button>(R.id.btnGCmdR)?.text = "Alt"
+            findViewById<Button>(R.id.btnGOptR)?.text = "⊞ Win"
+        }
+    }
+
+    @SuppressLint("ClickableViewAccessibility")
+    private fun setupGlobalKeyboard() {
+        btnGlobalKeyboard.setOnClickListener {
+            if (globalKeyboardOverlay.visibility == android.view.View.VISIBLE) {
+                globalKeyboardOverlay.visibility = android.view.View.GONE
+            } else {
+                globalKeyboardOverlay.visibility = android.view.View.VISIBLE
+                updateGlobalKeyboardLabels(currentInputMode)
+            }
+        }
+
+        btnGlobalKeyboardClose.setOnClickListener {
+            globalKeyboardOverlay.visibility = android.view.View.GONE
+        }
+
+        // Standard QWERTY key scancode map for global keyboard keys
+        val globalKeycodes = mapOf(
+            R.id.btnGEsc to 0x29.toByte(),
+            R.id.btnGF1 to 0x3A.toByte(),
+            R.id.btnGF2 to 0x3B.toByte(),
+            R.id.btnGF3 to 0x3C.toByte(),
+            R.id.btnGF4 to 0x3D.toByte(),
+            R.id.btnGF5 to 0x3E.toByte(),
+            R.id.btnGF6 to 0x3F.toByte(),
+            R.id.btnGF7 to 0x40.toByte(),
+            R.id.btnGF8 to 0x41.toByte(),
+            R.id.btnGF9 to 0x42.toByte(),
+            R.id.btnGF10 to 0x43.toByte(),
+            R.id.btnGF11 to 0x44.toByte(),
+            R.id.btnGF12 to 0x45.toByte(),
+            
+            R.id.btnGBacktick to 0x35.toByte(),
+            R.id.btnG1 to 0x1E.toByte(),
+            R.id.btnG2 to 0x1F.toByte(),
+            R.id.btnG3 to 0x20.toByte(),
+            R.id.btnG4 to 0x21.toByte(),
+            R.id.btnG5 to 0x22.toByte(),
+            R.id.btnG6 to 0x23.toByte(),
+            R.id.btnG7 to 0x24.toByte(),
+            R.id.btnG8 to 0x25.toByte(),
+            R.id.btnG9 to 0x26.toByte(),
+            R.id.btnG0 to 0x27.toByte(),
+            R.id.btnGMinus to 0x2D.toByte(),
+            R.id.btnGEqual to 0x2E.toByte(),
+            R.id.btnGBack to 0x2A.toByte(),
+            
+            R.id.btnGTab to 0x2B.toByte(),
+            R.id.btnGQ to 0x14.toByte(),
+            R.id.btnGW to 0x1A.toByte(),
+            R.id.btnGE to 0x08.toByte(),
+            R.id.btnGR to 0x15.toByte(),
+            R.id.btnGT to 0x17.toByte(),
+            R.id.btnGY to 0x1C.toByte(),
+            R.id.btnGU to 0x18.toByte(),
+            R.id.btnGI to 0x0C.toByte(),
+            R.id.btnGO to 0x12.toByte(),
+            R.id.btnGP to 0x13.toByte(),
+            R.id.btnGLBracket to 0x2F.toByte(),
+            R.id.btnGRBracket to 0x30.toByte(),
+            R.id.btnGBackslash to 0x31.toByte(),
+            
+            R.id.btnGCaps to 0x39.toByte(),
+            R.id.btnGA to 0x04.toByte(),
+            R.id.btnGS to 0x16.toByte(),
+            R.id.btnGD to 0x07.toByte(),
+            R.id.btnGF to 0x09.toByte(),
+            R.id.btnGG to 0x0A.toByte(),
+            R.id.btnGH to 0x0B.toByte(),
+            R.id.btnGJ to 0x0D.toByte(),
+            R.id.btnGK to 0x0E.toByte(),
+            R.id.btnGL to 0x0F.toByte(),
+            R.id.btnGSemicolon to 0x33.toByte(),
+            R.id.btnGQuote to 0x34.toByte(),
+            R.id.btnGEnter to 0x28.toByte(),
+            
+            R.id.btnGZ to 0x1D.toByte(),
+            R.id.btnGX to 0x1B.toByte(),
+            R.id.btnGC to 0x06.toByte(),
+            R.id.btnGV to 0x19.toByte(),
+            R.id.btnGB to 0x05.toByte(),
+            R.id.btnGN to 0x11.toByte(),
+            R.id.btnGM to 0x10.toByte(),
+            R.id.btnGComma to 0x36.toByte(),
+            R.id.btnGPeriod to 0x37.toByte(),
+            R.id.btnGSlash to 0x38.toByte(),
+            
+            R.id.btnGSpace to 0x2C.toByte(),
+            R.id.btnGLeft to 0x50.toByte(),
+            R.id.btnGUp to 0x52.toByte(),
+            R.id.btnGDown to 0x51.toByte(),
+            R.id.btnGRight to 0x4F.toByte()
+        )
+
+        globalKeycodes.forEach { (viewId, scanCode) ->
+            findViewById<Button>(viewId)?.setOnTouchListener { view, event ->
+                when (event.actionMasked) {
+                    MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> {
+                        view.isPressed = true
+                        pressedKeycodes.add(scanCode)
+                        sendKeyboardState()
+                        true
+                    }
+                    MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP, MotionEvent.ACTION_CANCEL -> {
+                        view.isPressed = false
+                        pressedKeycodes.remove(scanCode)
+                        sendKeyboardState()
+                        true
+                    }
+                    else -> false
+                }
+            }
+        }
+
+        // Left Shift
+        findViewById<Button>(R.id.btnGLShift)?.setOnTouchListener { view, event ->
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> {
+                    view.isPressed = true
+                    activeModifiers = (activeModifiers.toInt() or 0x02).toByte()
+                    sendKeyboardState()
+                    true
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP, MotionEvent.ACTION_CANCEL -> {
+                    view.isPressed = false
+                    activeModifiers = (activeModifiers.toInt() and 0x02.inv()).toByte()
+                    sendKeyboardState()
+                    true
+                }
+                else -> false
+            }
+        }
+
+        // Right Shift
+        findViewById<Button>(R.id.btnGRShift)?.setOnTouchListener { view, event ->
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> {
+                    view.isPressed = true
+                    activeModifiers = (activeModifiers.toInt() or 0x20).toByte()
+                    sendKeyboardState()
+                    true
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP, MotionEvent.ACTION_CANCEL -> {
+                    view.isPressed = false
+                    activeModifiers = (activeModifiers.toInt() and 0x20.inv()).toByte()
+                    sendKeyboardState()
+                    true
+                }
+                else -> false
+            }
+        }
+
+        // Left Ctrl
+        findViewById<Button>(R.id.btnGCtrlL)?.setOnTouchListener { view, event ->
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> {
+                    view.isPressed = true
+                    activeModifiers = (activeModifiers.toInt() or 0x01).toByte()
+                    sendKeyboardState()
+                    true
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP, MotionEvent.ACTION_CANCEL -> {
+                    view.isPressed = false
+                    activeModifiers = (activeModifiers.toInt() and 0x01.inv()).toByte()
+                    sendKeyboardState()
+                    true
+                }
+                else -> false
+            }
+        }
+
+        // Right Ctrl
+        findViewById<Button>(R.id.btnGCtrlR)?.setOnTouchListener { view, event ->
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> {
+                    view.isPressed = true
+                    activeModifiers = (activeModifiers.toInt() or 0x10).toByte()
+                    sendKeyboardState()
+                    true
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP, MotionEvent.ACTION_CANCEL -> {
+                    view.isPressed = false
+                    activeModifiers = (activeModifiers.toInt() and 0x10.inv()).toByte()
+                    sendKeyboardState()
+                    true
+                }
+                else -> false
+            }
+        }
+
+        // Left Option / Win (mac: Option 0x04, win: Win 0x08)
+        findViewById<Button>(R.id.btnGOptL)?.setOnTouchListener { view, event ->
+            val mod = if (currentInputMode == BluetoothHidManager.MODE_MAC) 0x04 else 0x08
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> {
+                    view.isPressed = true
+                    activeModifiers = (activeModifiers.toInt() or mod).toByte()
+                    sendKeyboardState()
+                    true
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP, MotionEvent.ACTION_CANCEL -> {
+                    view.isPressed = false
+                    activeModifiers = (activeModifiers.toInt() and mod.inv()).toByte()
+                    sendKeyboardState()
+                    true
+                }
+                else -> false
+            }
+        }
+
+        // Left Cmd / Alt (mac: Cmd 0x08, win: Alt 0x04)
+        findViewById<Button>(R.id.btnGCmdL)?.setOnTouchListener { view, event ->
+            val mod = if (currentInputMode == BluetoothHidManager.MODE_MAC) 0x08 else 0x04
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> {
+                    view.isPressed = true
+                    activeModifiers = (activeModifiers.toInt() or mod).toByte()
+                    sendKeyboardState()
+                    true
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP, MotionEvent.ACTION_CANCEL -> {
+                    view.isPressed = false
+                    activeModifiers = (activeModifiers.toInt() and mod.inv()).toByte()
+                    sendKeyboardState()
+                    true
+                }
+                else -> false
+            }
+        }
+
+        // Right Cmd / Alt (mac: Cmd 0x80, win: Alt 0x40)
+        findViewById<Button>(R.id.btnGCmdR)?.setOnTouchListener { view, event ->
+            val mod = if (currentInputMode == BluetoothHidManager.MODE_MAC) 0x80 else 0x40
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> {
+                    view.isPressed = true
+                    activeModifiers = (activeModifiers.toInt() or mod).toByte()
+                    sendKeyboardState()
+                    true
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP, MotionEvent.ACTION_CANCEL -> {
+                    view.isPressed = false
+                    activeModifiers = (activeModifiers.toInt() and mod.inv()).toByte()
+                    sendKeyboardState()
+                    true
+                }
+                else -> false
+            }
+        }
+
+        // Right Option / Win (mac: Option 0x40, win: Win 0x80)
+        findViewById<Button>(R.id.btnGOptR)?.setOnTouchListener { view, event ->
+            val mod = if (currentInputMode == BluetoothHidManager.MODE_MAC) 0x40 else 0x80
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> {
+                    view.isPressed = true
+                    activeModifiers = (activeModifiers.toInt() or mod).toByte()
+                    sendKeyboardState()
+                    true
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP, MotionEvent.ACTION_CANCEL -> {
+                    view.isPressed = false
+                    activeModifiers = (activeModifiers.toInt() and mod.inv()).toByte()
+                    sendKeyboardState()
+                    true
+                }
+                else -> false
+            }
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        isResumedState = true
+        isManualDisconnect = false
+        startReconnectLoop()
+    }
+
+    override fun onPause() {
+        super.onPause()
+        isResumedState = false
+        stopReconnectLoop()
+    }
+
+    private fun startReconnectLoop() {
+        if (!isResumedState || isManualDisconnect) return
+        if (currentInputMode != BluetoothHidManager.MODE_MAC) return
+        val service = btService ?: return
+        if (service.hidManager?.connectedDevice != null) return
+        if (reconnectRunnable != null) return // Already running
+        
+        Log.d(TAG, "Starting foreground reconnect loop...")
+        val runnable = object : Runnable {
+            override fun run() {
+                val s = btService
+                if (s == null || s.hidManager?.connectedDevice != null || currentInputMode != BluetoothHidManager.MODE_MAC || !isResumedState || isManualDisconnect || isFinishing || isDestroyed) {
+                    reconnectRunnable = null
+                    Log.d(TAG, "Stopping reconnect loop due to condition change.")
+                    return
+                }
+                
+                s.hidManager?.autoReconnectToLastDevice()
+                
+                reconnectRunnable = this
+                reconnectHandler.postDelayed(this, 5000)
+            }
+        }
+        reconnectRunnable = runnable
+        reconnectHandler.post(runnable)
+    }
+
+    private fun stopReconnectLoop() {
+        reconnectRunnable?.let {
+            reconnectHandler.removeCallbacks(it)
+            reconnectRunnable = null
+            Log.d(TAG, "Stopped reconnect loop.")
+        }
+    }
+
+    private fun triggerWakeReconnectIfNeeded() {
+        if (!isResumedState || isManualDisconnect || isFinishing || isDestroyed) return
+        val service = btService ?: return
+        if (service.hidManager?.connectedDevice == null) {
+            val now = System.currentTimeMillis()
+            if (now - lastWakeReconnectTime > 8000) {
+                lastWakeReconnectTime = now
+                Log.d(TAG, "Interaction detected in foreground while disconnected. Triggering wake-reconnect...")
+                service.hidManager?.autoReconnectToLastDevice()
+            }
+        }
+    }
+
     override fun onDestroy() {
+        isManualDisconnect = true
+        stopReconnectLoop()
         super.onDestroy()
         // Actively disconnect from host so Mac/PC knows the keyboard has gone offline
         btService?.hidManager?.disconnectFromHost()

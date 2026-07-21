@@ -16,3 +16,8 @@ dependencyResolutionManagement {
 
 rootProject.name = "kemi-bt-board"
 include(":app")
+
+val libDir = file("xunfei-auth-lib")
+if (libDir.exists() && libDir.isDirectory) {
+    include(":xunfei-auth-lib")
+}

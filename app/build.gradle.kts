@@ -11,8 +11,8 @@ android {
         applicationId = "com.kboard"
         minSdk = 31
         targetSdk = 34
-        versionCode = 3
-        versionName = "1.0.3"
+        versionCode = 4
+        versionName = "1.0.4"
     }
 
     signingConfigs {
@@ -54,4 +54,10 @@ dependencies {
     implementation("com.google.android.material:material:1.11.0")
     implementation("androidx.constraintlayout:constraintlayout:2.1.4")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    val libDir = rootProject.file("xunfei-auth-lib")
+    if (libDir.exists() && libDir.isDirectory) {
+        implementation(project(":xunfei-auth-lib"))
+    } else {
+        implementation(files("libs/xunfei-auth-lib-release.aar"))
+    }
 }

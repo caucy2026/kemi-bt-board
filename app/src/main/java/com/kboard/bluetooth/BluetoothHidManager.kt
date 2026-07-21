@@ -103,6 +103,7 @@ class BluetoothHidManager(private val context: Context, var listener: HidStateLi
     var connectedDevice: BluetoothDevice? = null
         private set
     private var isAppRegistered = false
+    
     var currentInputMode = MODE_MAC
 
     private val executor = Executors.newSingleThreadExecutor()
@@ -170,7 +171,6 @@ class BluetoothHidManager(private val context: Context, var listener: HidStateLi
             0x80.toByte(), // Mouse subclass (enforces Just Works pairing)
             HID_DESCRIPTOR
         )
-
         val callback = object : BluetoothHidDevice.Callback() {
             override fun onAppStatusChanged(device: BluetoothDevice?, registered: Boolean) {
                 super.onAppStatusChanged(device, registered)
@@ -178,7 +178,9 @@ class BluetoothHidManager(private val context: Context, var listener: HidStateLi
                 listener?.onLog("App Status Changed: registered = $registered")
                 listener?.onAppRegistered(registered)
                 if (registered) {
-                    autoReconnectToLastDevice()
+                    if (currentInputMode != MODE_MAC) {
+                        autoReconnectToLastDevice()
+                    }
                 }
             }
 
@@ -193,9 +195,7 @@ class BluetoothHidManager(private val context: Context, var listener: HidStateLi
                         prefs.edit().putString("last_connected_device", address).apply()
                     }
                 } else if (state == BluetoothProfile.STATE_DISCONNECTED) {
-                    if (connectedDevice == device) {
-                        connectedDevice = null
-                    }
+                    connectedDevice = null
                 }
                 listener?.onConnectionStateChanged(device, state)
             }
@@ -256,6 +256,8 @@ class BluetoothHidManager(private val context: Context, var listener: HidStateLi
         }
     }
 
+    // Reconnect loop methods removed from BluetoothHidManager and moved to MainActivity (foreground lifecycle-bound)
+
     private fun getStateString(state: Int): String {
         return when (state) {
             BluetoothProfile.STATE_DISCONNECTED -> "DISCONNECTED"
@@ -275,6 +277,50 @@ class BluetoothHidManager(private val context: Context, var listener: HidStateLi
         } catch (e: Exception) {
             Log.e(TAG, "Error during disconnect", e)
         }
+    }
+
+    fun clearAllPairsAndDisconnect() {
+        val adapter = bluetoothAdapter ?: return
+        val hid = hidDevice
+        
+        // 1. Actively disconnect
+        connectedDevice?.let { device ->
+            try {
+                hid?.disconnect(device)
+            } catch (e: Exception) {
+                Log.e(TAG, "Error disconnecting", e)
+            }
+        }
+        connectedDevice = null
+        
+        // 2. Clear stored last device in SharedPreferences
+        val prefs = context.getSharedPreferences("kboard_prefs", Context.MODE_PRIVATE)
+        prefs.edit().remove("last_connected_device").apply()
+        
+        // 3. Unpair all bonded devices using reflection to call hidden api removeBond()
+        try {
+            val bondedDevices = adapter.bondedDevices
+            if (bondedDevices != null) {
+                for (device in bondedDevices) {
+                    listener?.onLog("Unpairing device: ${device.name ?: device.address}...")
+                    val removeBondMethod = device.javaClass.getMethod("removeBond")
+                    removeBondMethod.invoke(device)
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error unpairing devices", e)
+        }
+        
+        // 4. Force scan mode to CONNECTABLE_DISCOVERABLE (23) again
+        try {
+            val setScanModeMethod = adapter.javaClass.getMethod("setScanMode", Int::class.javaPrimitiveType)
+            setScanModeMethod.invoke(adapter, 23)
+            listener?.onLog("Bluetooth scan mode set to discoverable (23)")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error setting scan mode", e)
+        }
+        
+        listener?.onLog("All pairings and connections cleared. Device is now discoverable.")
     }
 
     fun unregister() {
@@ -404,30 +450,41 @@ class BluetoothHidManager(private val context: Context, var listener: HidStateLi
         
         // 1. Hold Alt
         sendKeyboardReport(altMod, byteArrayOf(0))
-        try { Thread.sleep(8) } catch (e: Exception) {}
+        try { Thread.sleep(15) } catch (e: Exception) {}
         
         // 2. Press Keypad +
         sendKeyboardReport(altMod, byteArrayOf(keypadPlus))
-        try { Thread.sleep(5) } catch (e: Exception) {}
+        try { Thread.sleep(12) } catch (e: Exception) {}
         sendKeyboardReport(altMod, byteArrayOf(0))
-        try { Thread.sleep(5) } catch (e: Exception) {}
+        try { Thread.sleep(12) } catch (e: Exception) {}
         
-        // 3. Type 4 hex digits
+        // 3. Type 4 hex digits (Windows requires numpad keys for digits 0-9)
         for (hexChar in hex) {
-            val mapping = KeycodeTranslator.getHidScanCode(hexChar) ?: continue
-            val scancode = mapping.second
+            val scancode: Byte = when (hexChar) {
+                in '0'..'9' -> {
+                    if (hexChar == '0') {
+                        0x62.toByte() // Keypad 0
+                    } else {
+                        (0x59 + (hexChar - '1')).toByte() // Keypad 1-9
+                    }
+                }
+                in 'a'..'f' -> {
+                    (0x04 + (hexChar - 'a')).toByte() // Standard a-f
+                }
+                else -> continue
+            }
             
             // Press digit
             sendKeyboardReport(altMod, byteArrayOf(scancode))
-            try { Thread.sleep(5) } catch (e: Exception) {}
+            try { Thread.sleep(10) } catch (e: Exception) {}
             // Release digit, keep Alt
             sendKeyboardReport(altMod, byteArrayOf(0))
-            try { Thread.sleep(5) } catch (e: Exception) {}
+            try { Thread.sleep(10) } catch (e: Exception) {}
         }
         
         // 4. Release Alt
         sendKeyboardReport(0, byteArrayOf(0))
-        try { Thread.sleep(8) } catch (e: Exception) {}
+        try { Thread.sleep(15) } catch (e: Exception) {}
     }
 
     // Sends a Unicode string by splitting ASCII and Unicode characters
@@ -441,7 +498,7 @@ class BluetoothHidManager(private val context: Context, var listener: HidStateLi
                     // If we were in a Unicode block, release Option first
                     if (inMacUnicodeBlock) {
                         sendKeyboardReport(0, byteArrayOf(0))
-                        try { Thread.sleep(8) } catch (e: Exception) {}
+                        try { Thread.sleep(25) } catch (e: Exception) {} // Increased to 25ms to let OS register key release
                         inMacUnicodeBlock = false
                     }
                     
@@ -456,7 +513,7 @@ class BluetoothHidManager(private val context: Context, var listener: HidStateLi
                         // If not yet in Unicode block, hold Option
                         if (!inMacUnicodeBlock) {
                             sendKeyboardReport(altMod, byteArrayOf(0))
-                            try { Thread.sleep(8) } catch (e: Exception) {}
+                            try { Thread.sleep(15) } catch (e: Exception) {} // Increased to 15ms
                             inMacUnicodeBlock = true
                         }
                         
@@ -481,7 +538,7 @@ class BluetoothHidManager(private val context: Context, var listener: HidStateLi
             // If we finish and are still in a Unicode block, release Option
             if (inMacUnicodeBlock) {
                 sendKeyboardReport(0, byteArrayOf(0))
-                try { Thread.sleep(8) } catch (e: Exception) {}
+                try { Thread.sleep(25) } catch (e: Exception) {} // Increased to 25ms
             }
         }
     }
