@@ -320,6 +320,9 @@ class BluetoothHidManager(private val context: Context, var listener: HidStateLi
             Log.e(TAG, "Error setting scan mode", e)
         }
         
+        // 5. Force status callback to transition UI to DISCONNECTED since removeBond blocks system framework callbacks
+        listener?.onConnectionStateChanged(null, BluetoothProfile.STATE_DISCONNECTED)
+        
         listener?.onLog("All pairings and connections cleared. Device is now discoverable.")
     }
 
