@@ -100,8 +100,12 @@ class BluetoothHidManager(private val context: Context, var listener: HidStateLi
 
     private val bluetoothAdapter: BluetoothAdapter? = (context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager)?.adapter
     private var hidDevice: BluetoothHidDevice? = null
+    
+    @Volatile
     var connectedDevice: BluetoothDevice? = null
         private set
+        
+    @Volatile
     private var isAppRegistered = false
     
     var currentInputMode = MODE_MAC
@@ -125,6 +129,15 @@ class BluetoothHidManager(private val context: Context, var listener: HidStateLi
                     if (profile == BluetoothProfile.HID_DEVICE) {
                         hidDevice = proxy as? BluetoothHidDevice
                         listener?.onLog("BluetoothHidDevice proxy connected")
+                        
+                        // Check if already connected on startup to populate state
+                        val connectedDevs = hidDevice?.connectedDevices
+                        if (!connectedDevs.isNullOrEmpty()) {
+                            connectedDevice = connectedDevs[0]
+                            listener?.onLog("Already connected device found on startup: ${connectedDevice?.name ?: connectedDevice?.address}")
+                            listener?.onConnectionStateChanged(connectedDevice, BluetoothProfile.STATE_CONNECTED)
+                        }
+                        
                         registerHidApp()
                     }
                 }
@@ -266,6 +279,10 @@ class BluetoothHidManager(private val context: Context, var listener: HidStateLi
             BluetoothProfile.STATE_DISCONNECTING -> "DISCONNECTING"
             else -> "UNKNOWN ($state)"
         }
+    }
+
+    fun getConnectedDevicesDirectly(): List<BluetoothDevice> {
+        return hidDevice?.connectedDevices ?: emptyList()
     }
 
     fun disconnectFromHost() {

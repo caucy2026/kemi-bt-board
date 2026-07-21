@@ -1273,14 +1273,22 @@ class MainActivity : AppCompatActivity(), BluetoothHidManager.HidStateListener, 
         if (!isResumedState || isManualDisconnect) return
         if (currentInputMode != BluetoothHidManager.MODE_MAC) return
         val service = btService ?: return
-        if (service.hidManager?.connectedDevice != null) return
+        
+        // Double check via profile direct query to prevent triggering reconnect loop if already connected
+        val connectedDevices = service.hidManager?.getConnectedDevicesDirectly()
+        if (!connectedDevices.isNullOrEmpty() || service.hidManager?.connectedDevice != null) {
+            Log.d(TAG, "Device is already connected. Aborting reconnect loop.")
+            stopReconnectLoop()
+            return
+        }
         if (reconnectRunnable != null) return // Already running
         
         Log.d(TAG, "Starting foreground reconnect loop...")
         val runnable = object : Runnable {
             override fun run() {
                 val s = btService
-                if (s == null || s.hidManager?.connectedDevice != null || currentInputMode != BluetoothHidManager.MODE_MAC || !isResumedState || isManualDisconnect || isFinishing || isDestroyed) {
+                val directConnected = s?.hidManager?.getConnectedDevicesDirectly()
+                if (s == null || !directConnected.isNullOrEmpty() || s.hidManager?.connectedDevice != null || currentInputMode != BluetoothHidManager.MODE_MAC || !isResumedState || isManualDisconnect || isFinishing || isDestroyed) {
                     reconnectRunnable = null
                     Log.d(TAG, "Stopping reconnect loop due to condition change.")
                     return
@@ -1307,13 +1315,18 @@ class MainActivity : AppCompatActivity(), BluetoothHidManager.HidStateListener, 
     private fun triggerWakeReconnectIfNeeded() {
         if (!isResumedState || isManualDisconnect || isFinishing || isDestroyed) return
         val service = btService ?: return
-        if (service.hidManager?.connectedDevice == null) {
-            val now = System.currentTimeMillis()
-            if (now - lastWakeReconnectTime > 8000) {
-                lastWakeReconnectTime = now
-                Log.d(TAG, "Interaction detected in foreground while disconnected. Triggering wake-reconnect...")
-                service.hidManager?.autoReconnectToLastDevice()
-            }
+        
+        // Double check via profile direct query to prevent wake-reconnecting if already connected
+        val connectedDevices = service.hidManager?.getConnectedDevicesDirectly()
+        if (!connectedDevices.isNullOrEmpty() || service.hidManager?.connectedDevice != null) {
+            return
+        }
+        
+        val now = System.currentTimeMillis()
+        if (now - lastWakeReconnectTime > 8000) {
+            lastWakeReconnectTime = now
+            Log.d(TAG, "Interaction detected in foreground while disconnected. Triggering wake-reconnect...")
+            service.hidManager?.autoReconnectToLastDevice()
         }
     }
 
