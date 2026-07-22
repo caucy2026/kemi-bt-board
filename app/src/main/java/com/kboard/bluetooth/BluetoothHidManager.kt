@@ -231,6 +231,9 @@ class BluetoothHidManager(private val context: Context, var listener: HidStateLi
                 isAppRegistered = registered
                 listener?.onLog("App Status Changed: registered = $registered")
                 listener?.onAppRegistered(registered)
+                if (registered && !isManualDisconnect) {
+                    autoReconnectToLastDevice()
+                }
             }
 
             override fun onConnectionStateChanged(device: BluetoothDevice?, state: Int) {

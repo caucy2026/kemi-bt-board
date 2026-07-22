@@ -1294,6 +1294,13 @@ class MainActivity : AppCompatActivity(), BluetoothHidManager.HidStateListener, 
         }
     }
 
+    override fun dispatchTouchEvent(ev: MotionEvent?): Boolean {
+        if (ev?.action == MotionEvent.ACTION_DOWN) {
+            triggerWakeReconnectIfNeeded()
+        }
+        return super.dispatchTouchEvent(ev)
+    }
+
     override fun onDestroy() {
         isManualDisconnect = true
         stopReconnectLoop()
