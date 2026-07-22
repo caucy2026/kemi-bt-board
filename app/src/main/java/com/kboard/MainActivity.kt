@@ -79,6 +79,7 @@ class MainActivity : AppCompatActivity(), BluetoothHidManager.HidStateListener, 
     private var isResumedState = false
     private var lastWakeReconnectTime = 0L
     private var isManualDisconnect = false
+    private var reconnectRetryCount = 0
 
     private val serviceConnection = object : android.content.ServiceConnection {
         override fun onServiceConnected(name: android.content.ComponentName?, service: IBinder?) {
@@ -1270,11 +1271,51 @@ class MainActivity : AppCompatActivity(), BluetoothHidManager.HidStateListener, 
     }
 
     private fun startReconnectLoop() {
-        // Completely disabled per user request to test raw connection stability
-        return
+        if (!isResumedState || isManualDisconnect) return
+        if (currentInputMode != BluetoothHidManager.MODE_MAC) return
+        val service = btService ?: return
+        
+        // Double check via profile direct query to prevent triggering reconnect loop if already connected
+        val connectedDevices = service.hidManager?.getConnectedDevicesDirectly()
+        if (!connectedDevices.isNullOrEmpty() || service.hidManager?.connectedDevice != null) {
+            Log.d(TAG, "Device is already connected. Aborting reconnect loop.")
+            stopReconnectLoop()
+            return
+        }
+        if (reconnectRunnable != null) return // Already running
+        
+        reconnectRetryCount = 0
+        Log.d(TAG, "Starting foreground bounded reconnect loop (Max 3 retries)...")
+        
+        val runnable = object : Runnable {
+            override fun run() {
+                val s = btService
+                val directConnected = s?.hidManager?.getConnectedDevicesDirectly()
+                
+                // Termination conditions: already connected, not in Mac mode, paused, manual disconnect, or exceeded max retries (3)
+                if (s == null || !directConnected.isNullOrEmpty() || s.hidManager?.connectedDevice != null || 
+                    currentInputMode != BluetoothHidManager.MODE_MAC || !isResumedState || isManualDisconnect || 
+                    isFinishing || isDestroyed || reconnectRetryCount >= 3) {
+                    
+                    reconnectRunnable = null
+                    Log.d(TAG, "Stopping reconnect loop (Retries: $reconnectRetryCount, Resumed: $isResumedState).")
+                    return
+                }
+                
+                reconnectRetryCount++
+                Log.d(TAG, "Foreground reconnect attempt $reconnectRetryCount of 3...")
+                s.hidManager?.autoReconnectToLastDevice()
+                
+                reconnectRunnable = this
+                reconnectHandler.postDelayed(this, 2500)
+            }
+        }
+        reconnectRunnable = runnable
+        reconnectHandler.post(runnable)
     }
 
     private fun stopReconnectLoop() {
+        reconnectRetryCount = 0
         reconnectRunnable?.let {
             reconnectHandler.removeCallbacks(it)
             reconnectRunnable = null
@@ -1283,8 +1324,21 @@ class MainActivity : AppCompatActivity(), BluetoothHidManager.HidStateListener, 
     }
 
     private fun triggerWakeReconnectIfNeeded() {
-        // Completely disabled per user request to test raw connection stability
-        return
+        if (!isResumedState || isManualDisconnect || isFinishing || isDestroyed) return
+        val service = btService ?: return
+        
+        // Double check via profile direct query to prevent wake-reconnecting if already connected
+        val connectedDevices = service.hidManager?.getConnectedDevicesDirectly()
+        if (!connectedDevices.isNullOrEmpty() || service.hidManager?.connectedDevice != null) {
+            return
+        }
+        
+        val now = System.currentTimeMillis()
+        if (now - lastWakeReconnectTime > 5000) {
+            lastWakeReconnectTime = now
+            Log.d(TAG, "Interaction detected in foreground while disconnected. Triggering quick reconnect attempt...")
+            startReconnectLoop()
+        }
     }
 
     override fun onDestroy() {

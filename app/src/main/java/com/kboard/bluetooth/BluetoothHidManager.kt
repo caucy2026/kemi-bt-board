@@ -257,10 +257,10 @@ class BluetoothHidManager(private val context: Context, var listener: HidStateLi
                 listener?.onLog("Auto-connecting to paired host: ${device.name ?: device.address}...")
                 executor.execute {
                     try {
-                        Thread.sleep(1200) // Brief delay to let the Bluetooth stack settle
+                        Thread.sleep(500) // Brief delay to let the Bluetooth stack settle
                     } catch (e: Exception) {}
                     
-                    if (connectedDevice == null) {
+                    if (connectedDevice == null && getConnectedDevicesDirectly().isEmpty()) {
                         val success = hid.connect(device)
                         Log.d(TAG, "hidDevice.connect to $lastAddress returned: $success")
                         listener?.onLog("Initiating connection to $lastAddress: $success")
