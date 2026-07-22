@@ -324,7 +324,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="切换电脑的输入法"
-                        android:textColor="#CBD5E1"
+                        android:textColor="#FEF3C7"
                         android:textSize="9sp"
                         android:layout_marginTop="2dp" />
                 </LinearLayout>
