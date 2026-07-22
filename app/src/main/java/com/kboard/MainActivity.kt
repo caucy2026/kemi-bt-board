@@ -872,10 +872,10 @@ class MainActivity : AppCompatActivity(), BluetoothHidManager.HidStateListener, 
                 } else {
                     if (currentInputMode == BluetoothHidManager.MODE_MAC && isFirstMacAsrSend) {
                         isFirstMacAsrSend = false
-                        Log.d(TAG, "First Mac ASR send: sending Ctrl+Option+Space to activate Unicode Hex input source...")
-                        // Send Ctrl + Option + Space (Ctrl=0x01, Alt/Option=0x04 => 0x05, Space=0x2C)
-                        btService?.hidManager?.sendKeystroke(0x05.toByte(), 0x2C.toByte())
-                        try { Thread.sleep(250) } catch (e: Exception) {}
+                        Log.d(TAG, "First Mac ASR send: sending Ctrl+Space with 100ms hold time to switch input source...")
+                        // Send Ctrl + Space (Ctrl=0x01, Space=0x2C) with 100ms hold time
+                        btService?.hidManager?.sendKeystroke(0x01.toByte(), 0x2C.toByte(), 100L)
+                        try { Thread.sleep(350) } catch (e: Exception) {}
                     }
                     Log.d(TAG, "Sending final ASR text (Unicode mode=$currentInputMode): '$textToSend'")
                     btService?.hidManager?.sendUnicodeString(textToSend, currentInputMode)

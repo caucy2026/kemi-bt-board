@@ -585,11 +585,11 @@ class BluetoothHidManager(private val context: Context, var listener: HidStateLi
     }
 
     // Sends a keystroke (modifier + keycode) followed by key release
-    fun sendKeystroke(modifiers: Byte, keycode: Byte) {
+    fun sendKeystroke(modifiers: Byte, keycode: Byte, holdTimeMs: Long = 15L) {
         executor.execute {
             sendKeyboardReport(modifiers, byteArrayOf(keycode))
             try {
-                Thread.sleep(15)
+                Thread.sleep(holdTimeMs)
             } catch (e: InterruptedException) {
                 // ignore
             }
