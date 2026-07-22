@@ -80,6 +80,7 @@ class MainActivity : AppCompatActivity(), BluetoothHidManager.HidStateListener, 
     private var lastWakeReconnectTime = 0L
     private var isManualDisconnect = false
     private var reconnectRetryCount = 0
+    private var isFirstMacAsrSend = true
 
     private val serviceConnection = object : android.content.ServiceConnection {
         override fun onServiceConnected(name: android.content.ComponentName?, service: IBinder?) {
@@ -869,6 +870,13 @@ class MainActivity : AppCompatActivity(), BluetoothHidManager.HidStateListener, 
                     Log.d(TAG, "Sending final ASR text (Pinyin): '$textToSend', Translated: '$translated'")
                     btService?.hidManager?.sendAsciiString(translated)
                 } else {
+                    if (currentInputMode == BluetoothHidManager.MODE_MAC && isFirstMacAsrSend) {
+                        isFirstMacAsrSend = false
+                        Log.d(TAG, "First Mac ASR send: sending Ctrl+Option+Space to activate Unicode Hex input source...")
+                        // Send Ctrl + Option + Space (Ctrl=0x01, Alt/Option=0x04 => 0x05, Space=0x2C)
+                        btService?.hidManager?.sendKeystroke(0x05.toByte(), 0x2C.toByte())
+                        try { Thread.sleep(250) } catch (e: Exception) {}
+                    }
                     Log.d(TAG, "Sending final ASR text (Unicode mode=$currentInputMode): '$textToSend'")
                     btService?.hidManager?.sendUnicodeString(textToSend, currentInputMode)
                 }
