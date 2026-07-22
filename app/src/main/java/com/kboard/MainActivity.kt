@@ -334,6 +334,14 @@ class MainActivity : AppCompatActivity(), BluetoothHidManager.HidStateListener, 
         micButton.setOnTouchListener { _, event ->
             when (event.action) {
                 MotionEvent.ACTION_DOWN -> {
+                    // Pre-send input mode switch shortcut on DOWN so Mac/Win is ready BEFORE voice ends!
+                    if (currentInputMode == BluetoothHidManager.MODE_MAC) {
+                        Log.d(TAG, "Mic DOWN: Pre-sending Mac Ctrl+Space input source switch shortcut...")
+                        btService?.hidManager?.sendKeystroke(0x01.toByte(), 0x2C.toByte(), 100L)
+                    } else if (currentInputMode == BluetoothHidManager.MODE_WIN) {
+                        Log.d(TAG, "Mic DOWN: Pre-sending Win Shift English input mode switch shortcut...")
+                        btService?.hidManager?.sendKeystroke(0x02.toByte(), 0x00.toByte(), 50L)
+                    }
                     startASRProcess()
                     true
                 }
@@ -870,13 +878,6 @@ class MainActivity : AppCompatActivity(), BluetoothHidManager.HidStateListener, 
                     Log.d(TAG, "Sending final ASR text (Pinyin): '$textToSend', Translated: '$translated'")
                     btService?.hidManager?.sendAsciiString(translated)
                 } else {
-                    if (currentInputMode == BluetoothHidManager.MODE_MAC && isFirstMacAsrSend) {
-                        isFirstMacAsrSend = false
-                        Log.d(TAG, "First Mac ASR send: sending Ctrl+Space with 100ms hold time to switch input source...")
-                        // Send Ctrl + Space (Ctrl=0x01, Space=0x2C) with 100ms hold time
-                        btService?.hidManager?.sendKeystroke(0x01.toByte(), 0x2C.toByte(), 100L)
-                        try { Thread.sleep(350) } catch (e: Exception) {}
-                    }
                     Log.d(TAG, "Sending final ASR text (Unicode mode=$currentInputMode): '$textToSend'")
                     btService?.hidManager?.sendUnicodeString(textToSend, currentInputMode)
                 }

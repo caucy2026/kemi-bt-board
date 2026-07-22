@@ -71,18 +71,70 @@ object KeycodeTranslator {
     @Synchronized
     fun translateText(text: String): String {
         val sb = StringBuilder()
-        for (char in text) {
+        var i = 0
+        val len = text.length
+        while (i < len) {
+            val char = text[i]
             if (char.code in 0..127) {
-                sb.append(char)
+                // Collect continuous ASCII / English chunk
+                val start = i
+                while (i < len && text[i].code in 0..127) {
+                    i++
+                }
+                val asciiChunk = text.substring(start, i)
+                sb.append(formatAsciiChunkForPinyinMode(asciiChunk))
             } else {
+                // Chinese character or Chinese punctuation
                 val pinyin = transliterator.transliterate(char.toString())
-                if (pinyin.isNotEmpty()) {
+                if (pinyin.isNotEmpty() && pinyin[0] in 'a'..'z') {
                     sb.append(pinyin).append(' ')
                 } else {
-                    sb.append(' ')
+                    val asciiPunct = mapChinesePunctuationToAscii(char)
+                    sb.append(asciiPunct)
                 }
+                i++
             }
         }
         return sb.toString()
+    }
+
+    private fun formatAsciiChunkForPinyinMode(chunk: String): String {
+        val sb = StringBuilder()
+        var word = StringBuilder()
+        for (ch in chunk) {
+            if (ch.isLetter()) {
+                word.append(ch)
+            } else {
+                if (word.isNotEmpty()) {
+                    sb.append(word).append('\n') // Press Enter (\n) to force English word commit in Pinyin IME
+                    word.clear()
+                }
+                sb.append(ch)
+            }
+        }
+        if (word.isNotEmpty()) {
+            sb.append(word).append('\n')
+        }
+        return sb.toString()
+    }
+
+    private fun mapChinesePunctuationToAscii(char: Char): String {
+        return when (char) {
+            '，' -> ", "
+            '。' -> ". "
+            '！' -> "! "
+            '？' -> "? "
+            '：' -> ": "
+            '；' -> "; "
+            '“', '”' -> "\""
+            '‘', '’' -> "'"
+            '（' -> "("
+            '）' -> ")"
+            '【' -> "["
+            '】' -> "]"
+            '—' -> "-"
+            '…' -> "..."
+            else -> " "
+        }
     }
 }
