@@ -274,6 +274,37 @@ class BluetoothHidManager(private val context: Context, var listener: HidStateLi
         }
     }
 
+    fun onAclConnected(device: BluetoothDevice) {
+        Log.d(TAG, "ACL Physical Link Connected: ${device.address}")
+        disableAudioProfilesForDevice(device)
+        
+        val prefs = context.getSharedPreferences("kboard_prefs", Context.MODE_PRIVATE)
+        prefs.edit().putString("last_connected_device", device.address).apply()
+        
+        executor.execute {
+            try { Thread.sleep(400) } catch (e: Exception) {}
+            val directDevs = getConnectedDevicesDirectly()
+            if (directDevs.isNotEmpty()) {
+                connectedDevice = directDevs[0]
+                listener?.onConnectionStateChanged(connectedDevice, BluetoothProfile.STATE_CONNECTED)
+            } else if (connectedDevice == null) {
+                val hid = hidDevice
+                if (hid != null) {
+                    val success = hid.connect(device)
+                    Log.d(TAG, "ACL connected, initiating HID handshake to ${device.address}: $success")
+                }
+            }
+        }
+    }
+
+    fun onAclDisconnected(device: BluetoothDevice) {
+        Log.d(TAG, "ACL Physical Link Disconnected: ${device.address}")
+        if (connectedDevice?.address == device.address) {
+            connectedDevice = null
+            listener?.onConnectionStateChanged(device, BluetoothProfile.STATE_DISCONNECTED)
+        }
+    }
+
     // Reconnect loop methods removed from BluetoothHidManager and moved to MainActivity (foreground lifecycle-bound)
 
     private fun setLocalBluetoothClassToKeyboardMouse() {

@@ -33,60 +33,72 @@ class BluetoothHidService : Service() {
     private val pairingReceiver = object : android.content.BroadcastReceiver() {
         @android.annotation.SuppressLint("MissingPermission")
         override fun onReceive(context: Context, intent: Intent) {
-            if (intent.action == "android.bluetooth.device.action.PAIRING_REQUEST") {
-                val device = intent.getParcelableExtra<BluetoothDevice>(BluetoothDevice.EXTRA_DEVICE)
-                val pairingVariant = intent.getIntExtra("android.bluetooth.device.extra.PAIRING_VARIANT", -1)
-                val pairingKey = intent.getIntExtra("android.bluetooth.device.extra.PAIRING_KEY", -1)
-                Log.d("BluetoothHidService", "Auto-pairing receiver triggered for ${device?.address}, variant=$pairingVariant, key=$pairingKey")
-                
-                // Show a Toast to guide the user on the kboard device screen
-                try {
-                    android.widget.Toast.makeText(
-                        context,
-                        "已自动确认配对请求！请直接在手机上点击【配对】或【确认】即可连接",
-                        android.widget.Toast.LENGTH_LONG
-                    ).show()
-                } catch (e: Exception) {
-                    // ignore
+            when (intent.action) {
+                BluetoothDevice.ACTION_ACL_CONNECTED -> {
+                    val device = intent.getParcelableExtra<BluetoothDevice>(BluetoothDevice.EXTRA_DEVICE)
+                    Log.d("BluetoothHidService", "ACL Connected broadcast received for device ${device?.address}")
+                    device?.let { hidManager?.onAclConnected(it) }
                 }
-
-                try {
-                    when (pairingVariant) {
-                        0 -> { // PAIRING_VARIANT_PIN
-                            val pin = if (pairingKey != -1) {
-                                pairingKey.toString().toByteArray()
-                            } else {
-                                "0000".toByteArray()
-                            }
-                            device?.setPin(pin)
-                            Log.d("BluetoothHidService", "Auto-pairing: setPin called for PIN variant")
-                        }
-                        1 -> { // PAIRING_VARIANT_PASSKEY
-                            if (pairingKey != -1) {
-                                val pinBytes = String.format("%06d", pairingKey).toByteArray()
-                                device?.setPin(pinBytes)
-                                Log.d("BluetoothHidService", "Auto-pairing: setPin with passkey $pairingKey")
-                            } else {
-                                device?.setPin("000000".toByteArray())
-                            }
-                        }
-                        2, 3 -> { // PAIRING_VARIANT_PASSKEY_CONFIRMATION, PAIRING_VARIANT_CONSENT
-                            val setPairingConfirmationMethod = device?.javaClass?.getMethod("setPairingConfirmation", Boolean::class.javaPrimitiveType)
-                            setPairingConfirmationMethod?.invoke(device, true)
-                            Log.d("BluetoothHidService", "Auto-pairing: confirmed pairing/consent")
-                        }
-                        4, 5 -> { // PAIRING_VARIANT_DISPLAY_PASSKEY, PAIRING_VARIANT_DISPLAY_PIN
-                            val setPairingConfirmationMethod = device?.javaClass?.getMethod("setPairingConfirmation", Boolean::class.javaPrimitiveType)
-                            setPairingConfirmationMethod?.invoke(device, true)
-                            Log.d("BluetoothHidService", "Auto-pairing: confirmed display consent")
-                        }
-                    }
+                BluetoothDevice.ACTION_ACL_DISCONNECTED -> {
+                    val device = intent.getParcelableExtra<BluetoothDevice>(BluetoothDevice.EXTRA_DEVICE)
+                    Log.d("BluetoothHidService", "ACL Disconnected broadcast received for device ${device?.address}")
+                    device?.let { hidManager?.onAclDisconnected(it) }
+                }
+                "android.bluetooth.device.action.PAIRING_REQUEST" -> {
+                    val device = intent.getParcelableExtra<BluetoothDevice>(BluetoothDevice.EXTRA_DEVICE)
+                    val pairingVariant = intent.getIntExtra("android.bluetooth.device.extra.PAIRING_VARIANT", -1)
+                    val pairingKey = intent.getIntExtra("android.bluetooth.device.extra.PAIRING_KEY", -1)
+                    Log.d("BluetoothHidService", "Auto-pairing receiver triggered for ${device?.address}, variant=$pairingVariant, key=$pairingKey")
                     
-                    // Abort the system dialog broadcast so it does not show up
-                    abortBroadcast()
-                    Log.d("BluetoothHidService", "Auto-paired device successfully!")
-                } catch (e: Exception) {
-                    Log.e("BluetoothHidService", "Auto-pairing failed", e)
+                    // Show a Toast to guide the user on the kboard device screen
+                    try {
+                        android.widget.Toast.makeText(
+                            context,
+                            "已自动确认配对请求！请直接在手机上点击【配对】或【确认】即可连接",
+                            android.widget.Toast.LENGTH_LONG
+                        ).show()
+                    } catch (e: Exception) {
+                        // ignore
+                    }
+
+                    try {
+                        when (pairingVariant) {
+                            0 -> { // PAIRING_VARIANT_PIN
+                                val pin = if (pairingKey != -1) {
+                                    pairingKey.toString().toByteArray()
+                                } else {
+                                    "0000".toByteArray()
+                                }
+                                device?.setPin(pin)
+                                Log.d("BluetoothHidService", "Auto-pairing: setPin called for PIN variant")
+                            }
+                            1 -> { // PAIRING_VARIANT_PASSKEY
+                                if (pairingKey != -1) {
+                                    val pinBytes = String.format("%06d", pairingKey).toByteArray()
+                                    device?.setPin(pinBytes)
+                                    Log.d("BluetoothHidService", "Auto-pairing: setPin with passkey $pairingKey")
+                                } else {
+                                    device?.setPin("000000".toByteArray())
+                                }
+                            }
+                            2, 3 -> { // PAIRING_VARIANT_PASSKEY_CONFIRMATION, PAIRING_VARIANT_CONSENT
+                                val setPairingConfirmationMethod = device?.javaClass?.getMethod("setPairingConfirmation", Boolean::class.javaPrimitiveType)
+                                setPairingConfirmationMethod?.invoke(device, true)
+                                Log.d("BluetoothHidService", "Auto-pairing: confirmed pairing/consent")
+                            }
+                            4, 5 -> { // PAIRING_VARIANT_DISPLAY_PASSKEY, PAIRING_VARIANT_DISPLAY_PIN
+                                val setPairingConfirmationMethod = device?.javaClass?.getMethod("setPairingConfirmation", Boolean::class.javaPrimitiveType)
+                                setPairingConfirmationMethod?.invoke(device, true)
+                                Log.d("BluetoothHidService", "Auto-pairing: confirmed display consent")
+                            }
+                        }
+                        
+                        // Abort the system dialog broadcast so it does not show up
+                        abortBroadcast()
+                        Log.d("BluetoothHidService", "Auto-paired device successfully!")
+                    } catch (e: Exception) {
+                        Log.e("BluetoothHidService", "Auto-pairing failed", e)
+                    }
                 }
             }
         }
@@ -97,8 +109,11 @@ class BluetoothHidService : Service() {
         createNotificationChannel()
         startForegroundService()
         
-        // Register pairing receiver with highest priority
-        val filter = android.content.IntentFilter("android.bluetooth.device.action.PAIRING_REQUEST").apply {
+        // Register pairing and ACL receiver with highest priority
+        val filter = android.content.IntentFilter().apply {
+            addAction("android.bluetooth.device.action.PAIRING_REQUEST")
+            addAction(BluetoothDevice.ACTION_ACL_CONNECTED)
+            addAction(BluetoothDevice.ACTION_ACL_DISCONNECTED)
             priority = 2147483647 // Max integer priority to intercept before system UI
         }
         registerReceiver(pairingReceiver, filter)
