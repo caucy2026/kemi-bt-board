@@ -298,19 +298,36 @@
                     android:insetBottom="0dp"
                     android:layout_marginEnd="6dp" />
 
-                <Button
+                <LinearLayout
                     android:id="@+id/btnSwitchInputSource"
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
                     android:layout_weight="1"
-                    android:background="@drawable/key_modifier_selector"
-                    android:text="切换输入法"
-                    android:textColor="@color/white"
-                    android:textSize="13sp"
-                    android:textStyle="bold"
-                    android:insetTop="0dp"
-                    android:insetBottom="0dp"
-                    android:layout_marginEnd="6dp" />
+                    android:background="@drawable/button_switch_ime_selector"
+                    android:orientation="vertical"
+                    android:gravity="center"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:layout_marginEnd="6dp"
+                    android:paddingTop="2dp"
+                    android:paddingBottom="2dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="切换输入法"
+                        android:textColor="@color/white"
+                        android:textSize="13sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="切换电脑的输入法"
+                        android:textColor="#CBD5E1"
+                        android:textSize="9sp"
+                        android:layout_marginTop="2dp" />
+                </LinearLayout>
 
                 <Button
                     android:id="@+id/btnGlobalKeyboard"

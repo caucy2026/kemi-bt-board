@@ -345,7 +345,7 @@ class MainActivity : AppCompatActivity(), BluetoothHidManager.HidStateListener, 
             }
         }
 
-        val btnSwitchInputSource: Button = findViewById(R.id.btnSwitchInputSource)
+        val btnSwitchInputSource: android.view.View = findViewById(R.id.btnSwitchInputSource)
         btnSwitchInputSource.setOnClickListener {
             triggerWakeReconnectIfNeeded()
             if (currentInputMode == BluetoothHidManager.MODE_MAC) {
