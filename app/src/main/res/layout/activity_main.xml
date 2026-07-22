@@ -282,7 +282,7 @@
                 android:layout_height="64dp"
                 android:layout_marginTop="12dp"
                 android:orientation="horizontal"
-                android:weightSum="3">
+                android:weightSum="4">
 
                 <Button
                     android:id="@+id/micButton"
@@ -296,7 +296,21 @@
                     android:textStyle="bold"
                     android:insetTop="0dp"
                     android:insetBottom="0dp"
-                    android:layout_marginEnd="8dp" />
+                    android:layout_marginEnd="6dp" />
+
+                <Button
+                    android:id="@+id/btnSwitchInputSource"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:background="@drawable/key_modifier_selector"
+                    android:text="切换输入法"
+                    android:textColor="@color/white"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    android:insetTop="0dp"
+                    android:insetBottom="0dp"
+                    android:layout_marginEnd="6dp" />
 
                 <Button
                     android:id="@+id/btnGlobalKeyboard"
@@ -306,7 +320,7 @@
                     android:background="@drawable/key_modifier_selector"
                     android:text="全局键盘"
                     android:textColor="@color/white"
-                    android:textSize="15sp"
+                    android:textSize="13sp"
                     android:textStyle="bold"
                     android:insetTop="0dp"
                     android:insetBottom="0dp" />
