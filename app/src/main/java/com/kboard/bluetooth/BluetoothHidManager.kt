@@ -113,7 +113,43 @@ class BluetoothHidManager(private val context: Context, var listener: HidStateLi
     private val executor = Executors.newSingleThreadExecutor()
 
     init {
+        enforceSystemHidOnlyConfiguration()
         initProfileProxy()
+    }
+
+    fun enforceSystemHidOnlyConfiguration() {
+        try {
+            val cr = context.contentResolver
+            // 1. Permanently disable audio profiles (HFP=1, A2DP=2, A2DP_SINK=11, AVRCP=12, HFP_CLIENT=16) in system settings
+            android.provider.Settings.Global.putString(cr, "bluetooth_disabled_profiles", "1,2,11,12,16")
+            Log.d(TAG, "Settings.Global: Set bluetooth_disabled_profiles to 1,2,11,12,16")
+            
+            // 2. Force system global Class of Device to Keyboard/Mouse Combo (0x0025C0 = 2474432)
+            android.provider.Settings.Global.putInt(cr, "bluetooth_class_of_device", 0x0025C0)
+            android.provider.Settings.Global.putInt(cr, "bluetooth_device_class", 0x0025C0)
+            Log.d(TAG, "Settings.Global: Set bluetooth_class_of_device to 0x0025C0 (2474432)")
+            listener?.onLog("System HID-Only profile lock & 0x0025C0 CoD applied")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to update Settings.Global for HID-only configuration", e)
+        }
+        
+        // 3. Attempt to invoke hidden BluetoothAdapter APIs to disable audio profiles
+        val adapter = bluetoothAdapter
+        if (adapter != null) {
+            val audioProfiles = intArrayOf(1, 2, 11, 12, 16)
+            for (profile in audioProfiles) {
+                try {
+                    val setProfileEnabledMethod = adapter.javaClass.getMethod("setProfileEnabled", Int::class.javaPrimitiveType, Boolean::class.javaPrimitiveType)
+                    setProfileEnabledMethod.invoke(adapter, profile, false)
+                    Log.d(TAG, "BluetoothAdapter: setProfileEnabled($profile, false) succeeded")
+                } catch (e: Exception) {
+                    // Ignore if method not found
+                }
+            }
+        }
+        
+        // 4. Update local Bluetooth device class to Peripheral Keyboard/Mouse
+        setLocalBluetoothClassToKeyboardMouse()
     }
 
     private fun initProfileProxy() {
