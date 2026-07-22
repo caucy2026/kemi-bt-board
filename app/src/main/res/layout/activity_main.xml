@@ -482,7 +482,7 @@
                         android:textStyle="bold" />
                 </LinearLayout>
 
-                <!-- Row 2: CTRL, ALT, C, V, ENTER -->
+                <!-- Row 2: CTRL, C, V, ENTER (Double Width) -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="0dp"
@@ -499,18 +499,6 @@
                         android:layout_weight="1"
                         android:background="@drawable/key_modifier_selector"
                         android:text="CTRL"
-                        android:textColor="@color/white"
-                        android:textSize="12sp"
-                        android:textStyle="bold" />
-
-                    <Button
-                        android:id="@+id/keyAlt"
-                        android:layout_width="0dp"
-                        android:layout_height="match_parent"
-                        android:layout_weight="1"
-                        android:layout_marginStart="4dp"
-                        android:background="@drawable/key_modifier_selector"
-                        android:text="ALT"
                         android:textColor="@color/white"
                         android:textSize="12sp"
                         android:textStyle="bold" />
@@ -543,12 +531,12 @@
                         android:id="@+id/keyEnter"
                         android:layout_width="0dp"
                         android:layout_height="match_parent"
-                        android:layout_weight="1"
+                        android:layout_weight="2"
                         android:layout_marginStart="4dp"
                         android:background="@drawable/key_enter_selector"
                         android:text="ENTER"
                         android:textColor="@color/white"
-                        android:textSize="12sp"
+                        android:textSize="13sp"
                         android:textStyle="bold" />
                 </LinearLayout>
             </LinearLayout>

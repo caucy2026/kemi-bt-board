@@ -45,7 +45,6 @@ class MainActivity : AppCompatActivity(), BluetoothHidManager.HidStateListener, 
     private lateinit var keyEsc: Button
     private lateinit var keyToggleKeyboard: Button
     private lateinit var keyShift: Button
-    private lateinit var keyAlt: Button
     private lateinit var keyWinCmd: Button
     private lateinit var keyC: Button
     private lateinit var keyV: Button
@@ -138,7 +137,6 @@ class MainActivity : AppCompatActivity(), BluetoothHidManager.HidStateListener, 
         keyToggleKeyboard = findViewById(R.id.keyToggleKeyboard)
         keyShift = findViewById(R.id.keyShift)
         qwertyKeyboardOverlay = findViewById(R.id.qwertyKeyboardOverlay)
-        keyAlt = findViewById(R.id.keyAlt)
         keyWinCmd = findViewById(R.id.keyWinCmd)
         keyC = findViewById(R.id.keyC)
         keyV = findViewById(R.id.keyV)
@@ -526,25 +524,6 @@ class MainActivity : AppCompatActivity(), BluetoothHidManager.HidStateListener, 
                 MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP, MotionEvent.ACTION_CANCEL -> {
                     keyCtrl.isPressed = false
                     activeModifiers = (activeModifiers.toInt() and 0x01.inv()).toByte()
-                    sendKeyboardState()
-                    true
-                }
-                else -> false
-            }
-        }
-
-        // ALT (0x04)
-        keyAlt.setOnTouchListener { _, event ->
-            when (event.actionMasked) {
-                MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> {
-                    keyAlt.isPressed = true
-                    activeModifiers = (activeModifiers.toInt() or 0x04).toByte()
-                    sendKeyboardState()
-                    true
-                }
-                MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP, MotionEvent.ACTION_CANCEL -> {
-                    keyAlt.isPressed = false
-                    activeModifiers = (activeModifiers.toInt() and 0x04.inv()).toByte()
                     sendKeyboardState()
                     true
                 }
