@@ -126,11 +126,11 @@ class BluetoothHidManager(private val context: Context, var listener: HidStateLi
             android.provider.Settings.Global.putString(cr, "bluetooth_disabled_profiles", "1,2,11,12,16")
             Log.d(TAG, "Settings.Global: Set bluetooth_disabled_profiles to 1,2,11,12,16")
             
-            // 2. Force system global Class of Device to Keyboard/Mouse Combo (0x0025C0 = 2474432)
-            android.provider.Settings.Global.putInt(cr, "bluetooth_class_of_device", 0x0025C0)
-            android.provider.Settings.Global.putInt(cr, "bluetooth_device_class", 0x0025C0)
-            Log.d(TAG, "Settings.Global: Set bluetooth_class_of_device to 0x0025C0 (2474432)")
-            listener?.onLog("System HID-Only profile lock & 0x0025C0 CoD applied")
+            // 2. Force system global Class of Device to Keyboard Peripheral (0x000540 = 1344)
+            android.provider.Settings.Global.putInt(cr, "bluetooth_class_of_device", 0x000540)
+            android.provider.Settings.Global.putInt(cr, "bluetooth_device_class", 0x000540)
+            Log.d(TAG, "Settings.Global: Set bluetooth_class_of_device to 0x000540 (Keyboard)")
+            listener?.onLog("System HID-Only profile lock & 0x000540 Keyboard CoD applied")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to update Settings.Global for HID-only configuration", e)
         }
@@ -257,9 +257,9 @@ class BluetoothHidManager(private val context: Context, var listener: HidStateLi
 
         val sdpSettings = BluetoothHidDeviceAppSdpSettings(
             "kboard",
-            "Virtual HID Combo App",
+            "Virtual HID Keyboard",
             "Google Antigravity",
-            0x80.toByte(), // Mouse subclass (enforces Just Works pairing)
+            0x40.toByte(), // Keyboard subclass (enforces Keyboard device classification)
             HID_DESCRIPTOR
         )
         val callback = object : BluetoothHidDevice.Callback() {
@@ -376,8 +376,8 @@ class BluetoothHidManager(private val context: Context, var listener: HidStateLi
     private fun setLocalBluetoothClassToKeyboardMouse() {
         val adapter = bluetoothAdapter ?: return
         try {
-            // Class value for Keyboard/Mouse Combo (Peripheral)
-            val peripheralClassVal = 0x0025C0
+            // Class value for Keyboard Peripheral (0x000540)
+            val peripheralClassVal = 0x000540
             
             // Create BluetoothClass instance via reflection
             val bluetoothClassClass = Class.forName("android.bluetooth.BluetoothClass")
@@ -388,8 +388,8 @@ class BluetoothHidManager(private val context: Context, var listener: HidStateLi
             // Invoke setBluetoothClass on BluetoothAdapter
             val setBluetoothClassMethod = adapter.javaClass.getMethod("setBluetoothClass", bluetoothClassClass)
             val success = setBluetoothClassMethod.invoke(adapter, bluetoothClassInstance) as Boolean
-            Log.d(TAG, "setBluetoothClass to Keyboard/Mouse (0x0025C0) returned: $success")
-            listener?.onLog("Set Bluetooth Class to Keyboard/Mouse: $success")
+            Log.d(TAG, "setBluetoothClass to Keyboard (0x000540) returned: $success")
+            listener?.onLog("Set Bluetooth Class to Keyboard (0x000540): $success")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to set Bluetooth Class via reflection", e)
             listener?.onLog("Failed to set Bluetooth Class: ${e.message}")

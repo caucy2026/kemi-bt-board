@@ -305,16 +305,16 @@ class MainActivity : AppCompatActivity(), BluetoothHidManager.HidStateListener, 
         val bluetoothManager = getSystemService(android.content.Context.BLUETOOTH_SERVICE) as? android.bluetooth.BluetoothManager
         val bluetoothAdapter = bluetoothManager?.adapter ?: return
 
-        // Set Class of Device (CoD) to Mouse (0x000580)
+        // Set Class of Device (CoD) to Keyboard Peripheral (0x000540)
         try {
             val bluetoothClassClass = Class.forName("android.bluetooth.BluetoothClass")
             val constructor = bluetoothClassClass.getDeclaredConstructor(Int::class.javaPrimitiveType)
             constructor.isAccessible = true
-            val keyboardMouseCoD = constructor.newInstance(0x000580)
+            val keyboardCoD = constructor.newInstance(0x000540)
             
             val setBluetoothClassMethod = bluetoothAdapter.javaClass.getMethod("setBluetoothClass", bluetoothClassClass)
-            val success = setBluetoothClassMethod.invoke(bluetoothAdapter, keyboardMouseCoD) as Boolean
-            Log.d(TAG, "Bluetooth class of device set to Mouse (0x000580) successfully: $success")
+            val success = setBluetoothClassMethod.invoke(bluetoothAdapter, keyboardCoD) as Boolean
+            Log.d(TAG, "Bluetooth class of device set to Keyboard (0x000540) successfully: $success")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to set bluetooth class via reflection", e)
         }
