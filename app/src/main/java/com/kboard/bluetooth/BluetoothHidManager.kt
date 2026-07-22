@@ -198,14 +198,39 @@ class BluetoothHidManager(private val context: Context, var listener: HidStateLi
     }
 
     fun reinitProfileProxy() {
-        if (isAppRegistered) {
+        softRestartBluetoothStackAndReinit()
+    }
+
+    fun softRestartBluetoothStackAndReinit() {
+        val adapter = bluetoothAdapter ?: return
+        executor.execute {
             try {
-                hidDevice?.unregisterApp()
-            } catch (e: Exception) {}
-            isAppRegistered = false
+                listener?.onLog("Soft-restarting Bluetooth adapter to clear memory stack...")
+                if (isAppRegistered) {
+                    try { hidDevice?.unregisterApp() } catch (e: Exception) {}
+                    isAppRegistered = false
+                }
+                adapter.disable()
+                var retries = 0
+                while (adapter.state != BluetoothAdapter.STATE_OFF && retries < 25) {
+                    Thread.sleep(200)
+                    retries++
+                }
+                Thread.sleep(600)
+                adapter.enable()
+                retries = 0
+                while (adapter.state != BluetoothAdapter.STATE_ON && retries < 25) {
+                    Thread.sleep(200)
+                    retries++
+                }
+                Thread.sleep(800)
+                enforceSystemHidOnlyConfiguration()
+                initProfileProxy()
+            } catch (e: Exception) {
+                Log.e(TAG, "Error in softRestartBluetoothStackAndReinit", e)
+                initProfileProxy()
+            }
         }
-        enforceSystemHidOnlyConfiguration()
-        initProfileProxy()
     }
 
     private fun registerHidApp() {

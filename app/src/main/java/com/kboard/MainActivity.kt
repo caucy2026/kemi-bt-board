@@ -442,7 +442,25 @@ class MainActivity : AppCompatActivity(), BluetoothHidManager.HidStateListener, 
                 hintTextView.text = "提示: 拼音模式已开启。请确保接收端已切换为中文拼音输入法。"
             }
             BluetoothHidManager.MODE_MAC -> {
-                val builder = android.text.SpannableStringBuilder("提示: Mac直投模式已开启。请确保Mac已切换至【Unicode十六进制输入】输入法  ")
+                val fullText = "提示: Mac直投模式已开启。请确保Mac已切换至【Unicode十六进制输入】输入法  "
+                val builder = android.text.SpannableStringBuilder(fullText)
+                val targetStr = "请确保Mac已切换至【Unicode十六进制输入】输入法"
+                val startIdx = fullText.indexOf(targetStr)
+                if (startIdx >= 0) {
+                    val endIdx = startIdx + targetStr.length
+                    builder.setSpan(
+                        android.text.style.ForegroundColorSpan(android.graphics.Color.parseColor("#FFCA28")),
+                        startIdx,
+                        endIdx,
+                        android.text.Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+                    )
+                    builder.setSpan(
+                        android.text.style.StyleSpan(android.graphics.Typeface.BOLD),
+                        startIdx,
+                        endIdx,
+                        android.text.Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+                    )
+                }
                 val iconDrawable = androidx.core.content.ContextCompat.getDrawable(this, R.drawable.ic_mac_unicode_icon)
                 iconDrawable?.let {
                     val size = (14 * resources.displayMetrics.density).toInt()
