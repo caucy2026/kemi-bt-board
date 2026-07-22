@@ -334,13 +334,15 @@ class MainActivity : AppCompatActivity(), BluetoothHidManager.HidStateListener, 
         micButton.setOnTouchListener { _, event ->
             when (event.action) {
                 MotionEvent.ACTION_DOWN -> {
-                    // Pre-send input mode switch shortcut on DOWN so Mac/Win is ready BEFORE voice ends!
+                    // Pre-send absolute input mode switch shortcut on DOWN so Mac/Win is ready BEFORE voice ends!
                     if (currentInputMode == BluetoothHidManager.MODE_MAC) {
-                        Log.d(TAG, "Mic DOWN: Pre-sending Mac Ctrl+Space input source switch shortcut...")
-                        btService?.hidManager?.sendKeystroke(0x01.toByte(), 0x2C.toByte(), 100L)
+                        Log.d(TAG, "Mic DOWN: Pre-sending Mac absolute Unicode shortcut (Ctrl+Option+Shift+Space)...")
+                        // Send Ctrl + Option + Shift + Space (Ctrl=0x01, Shift=0x02, Alt/Option=0x04 => 0x07, Space=0x2C)
+                        btService?.hidManager?.sendKeystroke(0x07.toByte(), 0x2C.toByte(), 100L)
                     } else if (currentInputMode == BluetoothHidManager.MODE_WIN) {
-                        Log.d(TAG, "Mic DOWN: Pre-sending Win Shift English input mode switch shortcut...")
-                        btService?.hidManager?.sendKeystroke(0x02.toByte(), 0x00.toByte(), 50L)
+                        Log.d(TAG, "Mic DOWN: Pre-sending Win absolute ENG layout shortcut (Alt+Shift)...")
+                        // Send Left Alt + Left Shift (Shift=0x02, Alt=0x04 => 0x06) to switch language to ENG
+                        btService?.hidManager?.sendKeystroke(0x06.toByte(), 0x00.toByte(), 80L)
                     }
                     startASRProcess()
                     true

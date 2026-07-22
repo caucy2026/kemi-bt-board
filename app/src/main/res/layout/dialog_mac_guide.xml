@@ -26,7 +26,7 @@
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="1. 点击 Mac 左上角苹果图标  -> 系统设置\n\n2. 找到【键盘】-> 输入法 -> 点击【编辑...】\n\n3. 点击左下角【+】号，在搜索框中输入：Unicode 或 十六进制\n\n4. 选择【Unicode 十六进制输入】并点击【添加】\n\n5. 重要提示：打字前，点击 Mac 屏幕右上角输入法图标，切换至【Unicode 十六进制输入】(显示为 U+)"
+        android:text="1. 点击 Mac 左上角苹果图标  -> 系统设置\n\n2. 找到【键盘】-> 输入法 -> 点击【编辑...】\n\n3. 点击左下角【+】号，在搜索框中输入：Unicode 或 十六进制\n\n4. 选择【Unicode 十六进制输入】并点击【添加】\n\n5. 绝对自动切换：APP在按住说话时会自动发送【Ctrl + Option + Shift + Space】。建议将 Mac 的输入法快捷键设为此组合以实现绝对盲切。"
         android:textColor="#EEEEEE"
         android:textSize="12sp"
         android:lineSpacingMultiplier="1.15" />
