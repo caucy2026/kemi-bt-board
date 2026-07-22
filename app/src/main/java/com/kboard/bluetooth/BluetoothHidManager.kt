@@ -109,6 +109,8 @@ class BluetoothHidManager(private val context: Context, var listener: HidStateLi
     private var isAppRegistered = false
     
     var currentInputMode = MODE_MAC
+    @Volatile
+    var isManualDisconnect = false
 
     private val executor = Executors.newSingleThreadExecutor()
 
@@ -229,7 +231,7 @@ class BluetoothHidManager(private val context: Context, var listener: HidStateLi
                 isAppRegistered = registered
                 listener?.onLog("App Status Changed: registered = $registered")
                 listener?.onAppRegistered(registered)
-                if (registered) {
+                if (registered && !isManualDisconnect) {
                     autoReconnectToLastDevice()
                 }
             }
@@ -314,21 +316,12 @@ class BluetoothHidManager(private val context: Context, var listener: HidStateLi
         Log.d(TAG, "ACL Physical Link Connected: ${device.address}")
         disableAudioProfilesForDevice(device)
         
-        val prefs = context.getSharedPreferences("kboard_prefs", Context.MODE_PRIVATE)
-        prefs.edit().putString("last_connected_device", device.address).apply()
-        
         executor.execute {
             try { Thread.sleep(400) } catch (e: Exception) {}
             val directDevs = getConnectedDevicesDirectly()
             if (directDevs.isNotEmpty()) {
                 connectedDevice = directDevs[0]
                 listener?.onConnectionStateChanged(connectedDevice, BluetoothProfile.STATE_CONNECTED)
-            } else if (connectedDevice == null) {
-                val hid = hidDevice
-                if (hid != null) {
-                    val success = hid.connect(device)
-                    Log.d(TAG, "ACL connected, initiating HID handshake to ${device.address}: $success")
-                }
             }
         }
     }
@@ -432,6 +425,7 @@ class BluetoothHidManager(private val context: Context, var listener: HidStateLi
     }
 
     fun disconnectFromHost() {
+        isManualDisconnect = true
         val hid = hidDevice ?: return
         val device = connectedDevice ?: return
         Log.d(TAG, "Actively disconnecting from host: ${device.address}")
@@ -445,6 +439,7 @@ class BluetoothHidManager(private val context: Context, var listener: HidStateLi
     fun clearAllPairsAndDisconnect() {
         val adapter = bluetoothAdapter ?: return
         val hid = hidDevice
+        isManualDisconnect = true
         
         // 1. Actively disconnect
         connectedDevice?.let { device ->
