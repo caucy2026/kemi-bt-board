@@ -51,6 +51,12 @@ class TouchpadView @JvmOverloads constructor(
         textSize = 36f
         textAlign = Paint.Align.CENTER
     }
+    private val yellowTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = android.graphics.Color.parseColor("#FFCA28")
+        textSize = 34f
+        textAlign = Paint.Align.CENTER
+        isFakeBoldText = true
+    }
 
     fun setHidManager(manager: BluetoothHidManager) {
         this.hidManager = manager
@@ -67,7 +73,7 @@ class TouchpadView @JvmOverloads constructor(
         // Draw helper text in center
         canvas.drawText("移动单指控制鼠标", width / 2f, height / 2f - 40f, textPaint)
         canvas.drawText("单击左键 | 双指敲击右键 | 双指滑动滚轮", width / 2f, height / 2f + 10f, textPaint)
-        canvas.drawText("💡 未连接时，触摸任意按键或屏幕即可重连", width / 2f, height / 2f + 60f, textPaint)
+        canvas.drawText("💡 未连接时，触摸任意按键或屏幕即可重连", width / 2f, height / 2f + 60f, yellowTextPaint)
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {

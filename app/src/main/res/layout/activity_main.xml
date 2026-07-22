@@ -80,16 +80,6 @@
                     android:layout_marginStart="8dp" />
             </LinearLayout>
 
-            <TextView
-                android:id="@+id/reconnectNoticeText"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:text="💡 提示: 未连接时，触摸任意按键或屏幕即可重新连接最近设备"
-                android:textColor="#FFCA28"
-                android:textSize="11sp"
-                android:textStyle="bold" />
-
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
