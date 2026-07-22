@@ -355,14 +355,7 @@ class MainActivity : AppCompatActivity(), BluetoothHidManager.HidStateListener, 
             }
             btService?.hidManager?.currentInputMode = currentInputMode
             updateInputModeUI(currentInputMode)
-            if (currentInputMode == BluetoothHidManager.MODE_MAC) {
-                startReconnectLoop()
-            } else {
-                stopReconnectLoop()
-                if (btService?.hidManager?.connectedDevice == null) {
-                    btService?.hidManager?.autoReconnectToLastDevice()
-                }
-            }
+            triggerWakeReconnectIfNeeded()
 
             // Save input mode to SharedPreferences
             val prefs = getSharedPreferences("kboard_prefs", android.content.Context.MODE_PRIVATE)
@@ -1271,73 +1264,33 @@ class MainActivity : AppCompatActivity(), BluetoothHidManager.HidStateListener, 
     }
 
     private fun startReconnectLoop() {
-        if (!isResumedState || isManualDisconnect) return
-        if (currentInputMode != BluetoothHidManager.MODE_MAC) return
-        val service = btService ?: return
-        
-        // Double check via profile direct query to prevent triggering reconnect loop if already connected
-        val connectedDevices = service.hidManager?.getConnectedDevicesDirectly()
-        if (!connectedDevices.isNullOrEmpty() || service.hidManager?.connectedDevice != null) {
-            Log.d(TAG, "Device is already connected. Aborting reconnect loop.")
-            stopReconnectLoop()
-            return
-        }
-        if (reconnectRunnable != null) return // Already running
-        
-        reconnectRetryCount = 0
-        Log.d(TAG, "Starting foreground bounded reconnect loop (Max 3 retries)...")
-        
-        val runnable = object : Runnable {
-            override fun run() {
-                val s = btService
-                val directConnected = s?.hidManager?.getConnectedDevicesDirectly()
-                
-                // Termination conditions: already connected, not in Mac mode, paused, manual disconnect, or exceeded max retries (3)
-                if (s == null || !directConnected.isNullOrEmpty() || s.hidManager?.connectedDevice != null || 
-                    currentInputMode != BluetoothHidManager.MODE_MAC || !isResumedState || isManualDisconnect || 
-                    isFinishing || isDestroyed || reconnectRetryCount >= 3) {
-                    
-                    reconnectRunnable = null
-                    Log.d(TAG, "Stopping reconnect loop (Retries: $reconnectRetryCount, Resumed: $isResumedState).")
-                    return
-                }
-                
-                reconnectRetryCount++
-                Log.d(TAG, "Foreground reconnect attempt $reconnectRetryCount of 3...")
-                s.hidManager?.autoReconnectToLastDevice()
-                
-                reconnectRunnable = this
-                reconnectHandler.postDelayed(this, 2500)
-            }
-        }
-        reconnectRunnable = runnable
-        reconnectHandler.post(runnable)
+        // Completely disabled per user request: no automatic background/start polling
+        return
     }
 
     private fun stopReconnectLoop() {
-        reconnectRetryCount = 0
         reconnectRunnable?.let {
             reconnectHandler.removeCallbacks(it)
             reconnectRunnable = null
-            Log.d(TAG, "Stopped reconnect loop.")
         }
     }
 
     private fun triggerWakeReconnectIfNeeded() {
-        if (!isResumedState || isManualDisconnect || isFinishing || isDestroyed) return
+        if (!isResumedState || isFinishing || isDestroyed) return
         val service = btService ?: return
         
-        // Double check via profile direct query to prevent wake-reconnecting if already connected
+        // Double check direct connection: if already connected, do nothing
         val connectedDevices = service.hidManager?.getConnectedDevicesDirectly()
         if (!connectedDevices.isNullOrEmpty() || service.hidManager?.connectedDevice != null) {
             return
         }
         
         val now = System.currentTimeMillis()
-        if (now - lastWakeReconnectTime > 5000) {
+        if (now - lastWakeReconnectTime > 3000) { // 3-second throttle
             lastWakeReconnectTime = now
-            Log.d(TAG, "Interaction detected in foreground while disconnected. Triggering quick reconnect attempt...")
-            startReconnectLoop()
+            service.hidManager?.isManualDisconnect = false
+            Log.d(TAG, "User action detected while disconnected. Initiating on-demand reconnect...")
+            service.hidManager?.autoReconnectToLastDevice()
         }
     }
 
