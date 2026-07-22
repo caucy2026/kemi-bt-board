@@ -486,7 +486,30 @@ class BluetoothHidManager(private val context: Context, var listener: HidStateLi
         // 5. Force status callback to transition UI to DISCONNECTED since removeBond blocks system framework callbacks
         listener?.onConnectionStateChanged(null, BluetoothProfile.STATE_DISCONNECTED)
         
+        // 6. Restart Bluetooth stack to reload clean SDP without audio UUIDs (0x110C / 0x110E)
+        resetBluetoothStackToApplyHidOnly()
+        
         listener?.onLog("All pairings and connections cleared. Device is now discoverable.")
+    }
+
+    fun resetBluetoothStackToApplyHidOnly() {
+        val adapter = bluetoothAdapter ?: return
+        executor.execute {
+            try {
+                listener?.onLog("Restarting Bluetooth stack to reload clean HID-only SDP records...")
+                adapter.disable()
+                var retries = 0
+                while (adapter.state != BluetoothAdapter.STATE_OFF && retries < 20) {
+                    Thread.sleep(200)
+                    retries++
+                }
+                Thread.sleep(500)
+                adapter.enable()
+                listener?.onLog("Bluetooth stack restarted. Pure HID SDP records active!")
+            } catch (e: Exception) {
+                Log.e(TAG, "Error restarting bluetooth adapter", e)
+            }
+        }
     }
 
     fun unregister() {
