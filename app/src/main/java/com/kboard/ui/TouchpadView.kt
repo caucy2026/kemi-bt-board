@@ -65,8 +65,9 @@ class TouchpadView @JvmOverloads constructor(
         canvas.drawRoundRect(2f, 2f, width.toFloat() - 2f, height.toFloat() - 2f, rx, ry, strokePaint)
 
         // Draw helper text in center
-        canvas.drawText("移动单指控制鼠标", width / 2f, height / 2f - 20f, textPaint)
-        canvas.drawText("单击左键 | 双指敲击右键 | 双指滑动滚轮", width / 2f, height / 2f + 40f, textPaint)
+        canvas.drawText("移动单指控制鼠标", width / 2f, height / 2f - 40f, textPaint)
+        canvas.drawText("单击左键 | 双指敲击右键 | 双指滑动滚轮", width / 2f, height / 2f + 10f, textPaint)
+        canvas.drawText("💡 未连接时，触摸任意按键或屏幕即可重连", width / 2f, height / 2f + 60f, textPaint)
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {

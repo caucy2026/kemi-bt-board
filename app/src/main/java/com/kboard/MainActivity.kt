@@ -429,7 +429,7 @@ class MainActivity : AppCompatActivity(), BluetoothHidManager.HidStateListener, 
                 hintTextView.text = builder
             }
             BluetoothHidManager.MODE_WIN -> {
-                hintTextView.text = "提示: Win直投模式已开启。请确保Windows中已添加注册表【EnableHexNumpad=1】并重启。\n(配置方法: HKEY_CURRENT_USER\\Control Panel\\Input Method 下新建字符串值 EnableHexNumpad = 1)"
+                hintTextView.text = "提示: Win直投模式已开启。请确保电脑当前处于【英文输入状态】！未连接时触摸任意按键或屏幕重连。"
             }
         }
     }
