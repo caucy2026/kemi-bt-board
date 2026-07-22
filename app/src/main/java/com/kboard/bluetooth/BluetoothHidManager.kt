@@ -193,7 +193,19 @@ class BluetoothHidManager(private val context: Context, var listener: HidStateLi
         )
         if (!success) {
             listener?.onLog("Failed to get BluetoothHidDevice profile proxy")
+            listener?.onAppRegistered(false)
         }
+    }
+
+    fun reinitProfileProxy() {
+        if (isAppRegistered) {
+            try {
+                hidDevice?.unregisterApp()
+            } catch (e: Exception) {}
+            isAppRegistered = false
+        }
+        enforceSystemHidOnlyConfiguration()
+        initProfileProxy()
     }
 
     private fun registerHidApp() {

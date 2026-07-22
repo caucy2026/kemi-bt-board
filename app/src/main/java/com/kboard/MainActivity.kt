@@ -53,6 +53,7 @@ class MainActivity : AppCompatActivity(), BluetoothHidManager.HidStateListener, 
     private lateinit var btnModePinyin: Button
     private lateinit var btnModeMac: Button
     private lateinit var btnModeWin: Button
+    private lateinit var btnRetryBluetooth: Button
     private lateinit var hintTextView: TextView
     private lateinit var macButtonsLayout: android.widget.LinearLayout
     private lateinit var btnBypassMac: Button
@@ -146,6 +147,7 @@ class MainActivity : AppCompatActivity(), BluetoothHidManager.HidStateListener, 
         btnModePinyin = findViewById(R.id.btnModePinyin)
         btnModeMac = findViewById(R.id.btnModeMac)
         btnModeWin = findViewById(R.id.btnModeWin)
+        btnRetryBluetooth = findViewById(R.id.btnRetryBluetooth)
         hintTextView = findViewById(R.id.hintText)
         macButtonsLayout = findViewById(R.id.macButtonsLayout)
         btnBypassMac = findViewById(R.id.btnBypassMac)
@@ -379,8 +381,8 @@ class MainActivity : AppCompatActivity(), BluetoothHidManager.HidStateListener, 
         val btnClearConnections: Button = findViewById(R.id.btnClearConnections)
         btnClearConnections.setOnClickListener {
             androidx.appcompat.app.AlertDialog.Builder(this)
-                .setTitle("确认清除连接？")
-                .setMessage("这将会断开当前连接，清除配对记录，并重新使平板蓝牙处于可发现状态。")
+                .setTitle("⚠️ 确认清除蓝牙连接与配对？")
+                .setMessage("点击【确定】后将切断当前物理连接，清空所有已配对记录，并软重启蓝牙广播。确定要清除吗？")
                 .setPositiveButton("确定") { _, _ ->
                     isManualDisconnect = true
                     stopReconnectLoop()
@@ -389,6 +391,12 @@ class MainActivity : AppCompatActivity(), BluetoothHidManager.HidStateListener, 
                 }
                 .setNegativeButton("取消", null)
                 .show()
+        }
+
+        btnRetryBluetooth.setOnClickListener {
+            btnRetryBluetooth.visibility = android.view.View.GONE
+            statusText.text = "状态: 正在重新初始化蓝牙..."
+            btService?.hidManager?.reinitProfileProxy()
         }
 
         // Initialize UI with saved mode
@@ -786,6 +794,7 @@ class MainActivity : AppCompatActivity(), BluetoothHidManager.HidStateListener, 
     override fun onAppRegistered(registered: Boolean) {
         runOnUiThread {
             if (registered) {
+                btnRetryBluetooth.visibility = android.view.View.GONE
                 val connectedDev = btService?.hidManager?.connectedDevice
                 if (connectedDev != null) {
                     statusText.text = "状态: 已连接至主机 [${connectedDev.name ?: connectedDev.address}]"
@@ -797,13 +806,20 @@ class MainActivity : AppCompatActivity(), BluetoothHidManager.HidStateListener, 
                     applyJustWorksPairing()
                 }, 500)
             } else {
-                statusText.text = "状态: 注册蓝牙 HID 失败"
+                btnRetryBluetooth.visibility = android.view.View.VISIBLE
+                statusText.text = "状态: 蓝牙 HID 初始化失败，请点击右侧【刷新重试】"
             }
         }
     }
 
     override fun onLog(message: String) {
         Log.d(TAG, "HID Log: $message")
+        if (message.contains("Failed to get BluetoothHidDevice profile proxy") || message.contains("Failed to register HID App")) {
+            runOnUiThread {
+                btnRetryBluetooth.visibility = android.view.View.VISIBLE
+                statusText.text = "状态: 蓝牙 HID 代理失败，请点击右侧【刷新重试】"
+            }
+        }
     }
 
     // --- Xunfei ASR Client callbacks ---

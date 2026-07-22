@@ -78,6 +78,25 @@
                     android:paddingLeft="8dp"
                     android:paddingRight="8dp"
                     android:layout_marginStart="8dp" />
+
+                <Button
+                    android:id="@+id/btnRetryBluetooth"
+                    android:layout_width="wrap_content"
+                    android:layout_height="28dp"
+                    android:backgroundTint="#0284C7"
+                    android:text="刷新重试"
+                    android:textColor="@color/white"
+                    android:textSize="10sp"
+                    android:insetTop="0dp"
+                    android:insetBottom="0dp"
+                    android:minHeight="0dp"
+                    android:minWidth="0dp"
+                    android:paddingTop="2dp"
+                    android:paddingBottom="2dp"
+                    android:paddingLeft="8dp"
+                    android:paddingRight="8dp"
+                    android:layout_marginStart="8dp"
+                    android:visibility="gone" />
             </LinearLayout>
 
             <LinearLayout
