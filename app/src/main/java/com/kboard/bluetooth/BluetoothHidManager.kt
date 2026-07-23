@@ -117,6 +117,8 @@ class BluetoothHidManager(private val context: Context, var listener: HidStateLi
     var currentInputMode = MODE_MAC
     @Volatile
     var isManualDisconnect = false
+    @Volatile
+    private var isBtResetting = false  // true during clear/reset to suppress transient failure UI
 
     // A2DP state
     private var originalProfilesValue: String? = null
@@ -275,6 +277,11 @@ class BluetoothHidManager(private val context: Context, var listener: HidStateLi
                         }
                         
                         registerHidApp()
+                        // Clear reset flag & hide spinner when HID proxy reconnects after clear/reset
+                        if (isBtResetting) {
+                            isBtResetting = false
+                            listener?.onBtRestartState(false)
+                        }
                     }
                 }
 
@@ -283,7 +290,10 @@ class BluetoothHidManager(private val context: Context, var listener: HidStateLi
                         hidDevice = null
                         isAppRegistered = false
                         listener?.onLog("BluetoothHidDevice proxy disconnected")
-                        listener?.onAppRegistered(false)
+                        // Suppress failure UI during intentional BT reset (clear/reset flow)
+                        if (!isBtResetting) {
+                            listener?.onAppRegistered(false)
+                        }
                     }
                 }
             },
@@ -578,6 +588,7 @@ class BluetoothHidManager(private val context: Context, var listener: HidStateLi
         val adapter = bluetoothAdapter ?: return
         val hid = hidDevice
         isManualDisconnect = true
+        isBtResetting = true  // suppress all transient failure UI during this flow
         
         // 1. Actively disconnect
         connectedDevice?.let { device ->
@@ -629,6 +640,8 @@ class BluetoothHidManager(private val context: Context, var listener: HidStateLi
         val adapter = bluetoothAdapter ?: return
         executor.execute {
             try {
+                isBtResetting = true
+                listener?.onBtRestartState(true)
                 listener?.onLog("Restarting Bluetooth stack to reload clean HID-only SDP records...")
                 adapter.disable()
                 var retries = 0
@@ -638,9 +651,13 @@ class BluetoothHidManager(private val context: Context, var listener: HidStateLi
                 }
                 Thread.sleep(500)
                 adapter.enable()
+                Thread.sleep(200)  // let BT stack stabilize before HID proxy reconnects
                 listener?.onLog("Bluetooth stack restarted. Pure HID SDP records active!")
+                // onBtRestartState(false) + isBtResetting=false after HID proxy reconnects
             } catch (e: Exception) {
                 Log.e(TAG, "Error restarting bluetooth adapter", e)
+                isBtResetting = false
+                listener?.onBtRestartState(false)
             }
         }
     }

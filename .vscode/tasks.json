@@ -1,0 +1,21 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Scan Bluetooth via CMD",
+			"type": "shell",
+			"command": "cmd",
+			"args": ["/c", "python", "D:\\work\\ai_code\\kemi-bt-board\\scratch\\bt_scan_v2.py"],
+			"problemMatcher": [],
+			"group": "none"
+		},
+		{
+			"label": "Check BT via CMD",
+			"type": "shell",
+			"command": "cmd",
+			"args": ["/c", "echo Bluetooth devices: && pnputil /enum-devices /class Bluetooth"],
+			"problemMatcher": [],
+			"group": "none"
+		}
+	]
+}

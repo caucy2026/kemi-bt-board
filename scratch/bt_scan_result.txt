@@ -1,0 +1,217 @@
+=== pnputil Bluetooth devices ===
+Microsoft PnP 工具
+
+实例 ID:                BTHENUM\Dev_B5C37F98DD9A\7&1afd9acc&0&BluetoothDevice_B5C37F98DD9A
+设备描述:         Project_NL
+类名:                 Bluetooth
+类 GUID:                 {e0cbf06c-cd8b-4647-bb8a-263b43f0f974}
+制造商名称:          Microsoft
+状态:                     已启动
+驱动程序名称:                bth.inf
+
+实例 ID:                BTH\MS_BTHBRB\6&9054350&0&1
+设备描述:         Microsoft 蓝牙枚举器
+类名:                 Bluetooth
+类 GUID:                 {e0cbf06c-cd8b-4647-bb8a-263b43f0f974}
+制造商名称:          Microsoft
+状态:                     已启动
+驱动程序名称:                bth.inf
+
+实例 ID:                BTH\MS_BTHLE\6&9054350&0&3
+设备描述:         Microsoft 蓝牙 LE 枚举器
+类名:                 Bluetooth
+类 GUID:                 {e0cbf06c-cd8b-4647-bb8a-263b43f0f974}
+制造商名称:          Microsoft
+状态:                     已启动
+驱动程序名称:                bthleenum.inf
+
+实例 ID:                BTHENUM\Dev_0467610E1EE2\7&1afd9acc&0&BluetoothDevice_0467610E1EE2
+设备描述:         小爱音箱-2125
+类名:                 Bluetooth
+类 GUID:                 {e0cbf06c-cd8b-4647-bb8a-263b43f0f974}
+制造商名称:          Microsoft
+状态:                     已启动
+驱动程序名称:                bth.inf
+
+实例 ID:                BTHENUM\{0000110c-0000-1000-8000-00805f9b34fb}_VID&000100e0_PID&1200\7&1afd9acc&0&0467610E1EE2_C00000000
+设备描述:         小爱音箱-2125 Avrcp 传输
+类名:                 Bluetooth
+类 GUID:                 {e0cbf06c-cd8b-4647-bb8a-263b43f0f974}
+制造商名称:          Microsoft
+状态:                     已启动
+驱动程序名称:                microsoft_bluetooth_avrcptransport.inf
+
+实例 ID:                BTHLE\Dev_a46b401772a3\7&2c047758&0&a46b401772a3
+设备描述:         KEMI-KB-72A2
+类名:                 Bluetooth
+类 GUID:                 {e0cbf06c-cd8b-4647-bb8a-263b43f0f974}
+制造商名称:          Microsoft
+状态:                     已启动
+驱动程序名称:                bthleenum.inf
+
+实例 ID:                BTHENUM\{0000110c-0000-1000-8000-00805f9b34fb}_VID&000105d6_PID&000a\7&1afd9acc&0&B5C37F98DD9A_C00000000
+设备描述:         Project_NL Avrcp 传输
+类名:                 Bluetooth
+类 GUID:                 {e0cbf06c-cd8b-4647-bb8a-263b43f0f974}
+制造商名称:          Microsoft
+状态:                     已启动
+驱动程序名称:                microsoft_bluetooth_avrcptransport.inf
+
+实例 ID:                BTHLEDevice\{0000180a-0000-1000-8000-00805f9b34fb}_Dev_VID&023554_PID&f533_REV&0001_f22bae1db684\8&37422bf5&0&000b
+设备描述:         设备信息服务
+类名:                 Bluetooth
+类 GUID:                 {e0cbf06c-cd8b-4647-bb8a-263b43f0f974}
+制造商名称:          Microsoft
+状态:                     已启动
+驱动程序名称:                bthleenum.inf
+
+实例 ID:                BTHENUM\{0000110e-0000-1000-8000-00805f9b34fb}_VID&000100e0_PID&1200\7&1afd9acc&0&0467610E1EE2_C00000000
+设备描述:         小爱音箱-2125 Avrcp 传输
+类名:                 Bluetooth
+类 GUID:                 {e0cbf06c-cd8b-4647-bb8a-263b43f0f974}
+制造商名称:          Microsoft
+状态:                     已启动
+驱动程序名称:                microsoft_bluetooth_avrcptransport.inf
+
+实例 ID:                BTH\MS_RFCOMM\6&9054350&0&0
+设备描述:         Bluetooth Device (RFCOMM Protocol TDI)
+类名:                 Bluetooth
+类 GUID:                 {e0cbf06c-cd8b-4647-bb8a-263b43f0f974}
+制造商名称:          Microsoft
+状态:                     已启动
+驱动程序名称:                tdibth.inf
+
+实例 ID:                BTHENUM\Dev_A46B401772A3\7&1afd9acc&0&BluetoothDevice_A46B401772A3
+设备描述:         KEMI-KB-72A2
+类名:                 Bluetooth
+类 GUID:                 {e0cbf06c-cd8b-4647-bb8a-263b43f0f974}
+制造商名称:          Microsoft
+状态:                     已启动
+驱动程序名称:                bth.inf
+
+实例 ID:                BTHENUM\{00001116-0000-1000-8000-00805f9b34fb}_VID&000100e0_PID&1200\7&1afd9acc&0&A46B401772A3_C00000000
+设备描述:         个人区域网 NAP 服务
+类名:                 Bluetooth
+类 GUID:                 {e0cbf06c-cd8b-4647-bb8a-263b43f0f974}
+制造商名称:          Microsoft
+状态:                     已启动
+驱动程序名称:                bth.inf
+
+实例 ID:                BTHLEDevice\{0000180f-0000-1000-8000-00805f9b34fb}_Dev_VID&023554_PID&f533_REV&0001_f22bae1db684\8&37422bf5&0&001a
+设备描述:         蓝牙 LE 通用属性服务
+类名:                 Bluetooth
+类 GUID:                 {e0cbf06c-cd8b-4647-bb8a-263b43f0f974}
+制造商名称:          Microsoft
+状态:                     已启动
+驱动程序名称:                bthleenum.inf
+
+实例 ID:                BTHENUM\{0000110e-0000-1000-8000-00805f9b34fb}_VID&000105d6_PID&000a\7&1afd9acc&0&B5C37F98DD9A_C00000000
+设备描述:         Project_NL Avrcp 传输
+类名:                 Bluetooth
+类 GUID:                 {e0cbf06c-cd8b-4647-bb8a-263b43f0f974}
+制造商名称:          Microsoft
+状态:                     已启动
+驱动程序名称:                microsoft_bluetooth_avrcptransport.inf
+
+实例 ID:                BTHLEDevice\{00001800-0000-1000-8000-00805f9b34fb}_Dev_VID&023554_PID&f533_REV&0001_f22bae1db684\8&37422bf5&0&0001
+设备描述:         通用访问配置文件
+类名:                 Bluetooth
+类 GUID:                 {e0cbf06c-cd8b-4647-bb8a-263b43f0f974}
+制造商名称:          Microsoft
+状态:                     已启动
+驱动程序名称:                bthleenum.inf
+
+实例 ID:                USB\VID_8087&PID_0AAA\5&20653a1f&0&10
+设备描述:         英特尔(R) 无线 Bluetooth(R)
+类名:                 Bluetooth
+类 GUID:                 {e0c
+
+
+=== Bluetooth Registry Devices (HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\BTHPORT\Parameters\Devices) ===
+  0467610e1ee2: b'\xe5\xb0\x8f\xe7\x88\xb1\xe9\x9f\xb3\xe7\xae\xb1-2125\x00'
+  a46b401772a3: b'KEMI-KB-72A2\x00'
+  b5c37f98dd9a: b'Project_NL\x00'
+  f22bae1db684: b'Gravastar M1\x00'
+
+.NET clr not available
+
+[OK] Loaded BluetoothAPIs.dll
+
+=== CACHED Bluetooth Devices ===
+FAILED: Error 1306 (0x51A)
+
+
+=== LIVE INQUIRY SCAN (20 sec) ===
+Make sure KEMI device is discoverable!
+FAILED: Error 1306
+=== Registry for KEMI device (a46b401772a3) ===
+  DibServiceVersion: 0x00020000 (131072)
+  COD: 0x002C0428 (2884648)
+  Name (binary): 4b454d492d4b422d3732413200
+  HostSupportedFeaturesMap: 15
+  LMPFeatures: 9762464619377274559
+  ManufacturerId: 0x00000B3B (2875)
+  LmpVersion: 0x0000000D (13)
+  LmpSubversion: 0x0000000B (11)
+  LastSeen: 134291290960711677
+  LastConnected: 134291290960711677
+  FriendlyName (binary): 00
+  LocalEvaldIoCap: 0x00000001 (1)
+  LocalEvaldIoCapLE: 0x000000FF (255)
+  LEAppearance: 0x00000000 (0)
+  LEAddressType: 0x00000000 (0)
+  VID: 0x000000E0 (224)
+  PID: 0x00001200 (4608)
+  VIDType: 0x00000001 (1)
+  Version: 0x00000000 (0)
+  FingerprintTimestamp: 134291002783960000
+  FingerprintVersion: 0x00000002 (2)
+  FingerprintString: Fingerprint:0D;0B3B;000B;877B3DD8FA4D2EBF;2C0428;ABC9E019D882BDD5;B82381DBE5F9EAA8;00E0;1200;0000;00;FFFF;0000;00;0000000000000000;FF084737D59D71F7;
+
+=== a46b401772a3 ===
+  DibServiceVersion: 131072
+  COD: 2884648
+  Name: b'KEMI-KB-72A2\x00'
+  HostSupportedFeaturesMap: 15
+  LMPFeatures: 9762464619377274559
+  ManufacturerId: 2875
+  LmpVersion: 13
+  LmpSubversion: 11
+  LastSeen: 134291290960711677
+  LastConnected: 134291290960711677
+  FriendlyName: b'\x00'
+  LocalEvaldIoCap: 1
+  LocalEvaldIoCapLE: 255
+  LEAppearance: 0
+  LEAddressType: 0
+  VID: 224
+  PID: 4608
+  VIDType: 1
+  Version: 0
+  FingerprintTimestamp: 134291002783960000
+  FingerprintVersion: 2
+  FingerprintString: Fingerprint:0D;0B3B;000B;877B3DD8FA4D2EBF;2C0428;ABC9E019D882BDD5;B82381DBE5F9EAA8;00E0;1200;0000;00;FFFF;0000;00;0000000000000000;FF084737D59D71F7;
+
+=== A46B401772A3 ===
+  DibServiceVersion: 131072
+  COD: 2884648
+  Name: b'KEMI-KB-72A2\x00'
+  HostSupportedFeaturesMap: 15
+  LMPFeatures: 9762464619377274559
+  ManufacturerId: 2875
+  LmpVersion: 13
+  LmpSubversion: 11
+  LastSeen: 134291290960711677
+  LastConnected: 134291290960711677
+  FriendlyName: b'\x00'
+  LocalEvaldIoCap: 1
+  LocalEvaldIoCapLE: 255
+  LEAppearance: 0
+  LEAddressType: 0
+  VID: 224
+  PID: 4608
+  VIDType: 1
+  Version: 0
+  FingerprintTimestamp: 134291002783960000
+  FingerprintVersion: 2
+  FingerprintString: Fingerprint:0D;0B3B;000B;877B3DD8FA4D2EBF;2C0428;ABC9E019D882BDD5;B82381DBE5F9EAA8;00E0;1200;0000;00;FFFF;0000;00;0000000000000000;FF084737D59D71F7;
