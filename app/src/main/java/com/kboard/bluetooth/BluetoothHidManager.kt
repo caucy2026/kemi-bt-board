@@ -359,8 +359,14 @@ class BluetoothHidManager(private val context: Context, var listener: HidStateLi
                         val prefs = context.getSharedPreferences("kboard_prefs", Context.MODE_PRIVATE)
                         prefs.edit().putString("last_connected_device", address).apply()
                     }
+                    // Connected: switch to CONNECTABLE only (not discoverable to other hosts)
+                    setScanMode(21)  // SCAN_MODE_CONNECTABLE
+                    Log.d(TAG, "ScanMode set to CONNECTABLE (21) — device is connected, hidden from other hosts")
                 } else if (state == BluetoothProfile.STATE_DISCONNECTED) {
                     connectedDevice = null
+                    // Disconnected: restore discoverable mode so other hosts can find us
+                    setScanMode(23)  // SCAN_MODE_CONNECTABLE_DISCOVERABLE
+                    Log.d(TAG, "ScanMode set to CONNECTABLE_DISCOVERABLE (23) — device is free for new connections")
                 }
                 listener?.onConnectionStateChanged(device, state)
             }
@@ -445,6 +451,17 @@ class BluetoothHidManager(private val context: Context, var listener: HidStateLi
     }
 
     // Reconnect loop methods removed from BluetoothHidManager and moved to MainActivity (foreground lifecycle-bound)
+
+    // Set Bluetooth scan mode via reflection (21=CONNECTABLE, 23=CONNECTABLE_DISCOVERABLE)
+    private fun setScanMode(mode: Int) {
+        val adapter = bluetoothAdapter ?: return
+        try {
+            val m = adapter.javaClass.getMethod("setScanMode", Int::class.javaPrimitiveType)
+            m.invoke(adapter, mode)
+        } catch (e: Exception) {
+            Log.e(TAG, "setScanMode($mode) failed: ${e.message}")
+        }
+    }
 
     private fun setLocalBluetoothClassToKeyboardMouse() {
         val adapter = bluetoothAdapter ?: return
@@ -613,9 +630,12 @@ class BluetoothHidManager(private val context: Context, var listener: HidStateLi
                 }
                 Thread.sleep(500)
                 adapter.enable()
-                Thread.sleep(200)  // let BT stack stabilize before HID proxy reconnects
-                listener?.onLog("Bluetooth stack restarted. Pure HID SDP records active!")
-                // onBtRestartState(false) + isBtResetting=false after HID proxy reconnects
+                Thread.sleep(200)  // let BT stack stabilize
+                // Re-register HID app after BT restart so device is discoverable
+                enforceSystemHidOnlyConfiguration()
+                initProfileProxy()
+                listener?.onLog("Bluetooth stack restarted. HID re-registered. Device is discoverable as keyboard+mouse.")
+                // isBtResetting=false + onBtRestartState(false) handled in onServiceConnected
             } catch (e: Exception) {
                 Log.e(TAG, "Error restarting bluetooth adapter", e)
                 isBtResetting = false

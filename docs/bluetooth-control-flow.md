@@ -556,6 +556,21 @@ BluetoothAdapter 广播 → BluetoothHidService.pairingReceiver
 - 进入 APP → `putInt(2052)` → A2DP Source+Sink 双禁用 ✅（无需重启蓝牙）
 - 退出 APP → `putInt(2048)` → A2DP Source 恢复，Sink 仍禁用 ✅
 
+### v1.0.45 (2026-07-23) — 清除连接后重注册 HID
+
+| 改动 | 说明 |
+|------|------|
+| `resetBluetoothStackToApplyHidOnly` | BT OFF→ON 后主动调用 `enforceSystemHidOnlyConfiguration()` + `initProfileProxy()` |
+| 清除后立即可被发现 | 之前等 HID proxy 自动重连（时间不确定），现在主动注册 |
+
+### v1.0.46 (2026-07-23) — 连接时隐藏设备
+
+| 改动 | 说明 |
+|------|------|
+| `setScanMode(21)` 连接时 | 设备连上主机后切换为 `CONNECTABLE`（不被其他主机扫描到） |
+| `setScanMode(23)` 断开时 | 断开后恢复 `CONNECTABLE_DISCOVERABLE`（可被新主机发现） |
+| 新增 `setScanMode()` 反射方法 | 统一管理扫描模式切换 |
+
 ### 8.4 音频 Profile 禁用 (per-device)
 
 ```
