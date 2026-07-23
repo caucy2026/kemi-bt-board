@@ -535,6 +535,27 @@ BluetoothAdapter 广播 → BluetoothHidService.pairingReceiver
         └─ connectedDevice = null
 ```
 
+---
+
+## 版本记录
+
+### v1.0.44 (2026-07-23) — A2DP 精简终版
+
+| 改动 | 说明 |
+|------|------|
+| **SystemProperties.set** (反射) | 替代 `Runtime.exec("setprop")`，系统应用原生 API |
+| **Settings.Global.putInt(2052)** | 替代 `putString`，整型写入 SettingsProvider |
+| **进入不重启蓝牙** | `init{}` 直接 `initProfileProxy()`，去掉 `performBtOffOnCycle` |
+| **退出写 2048** | `restoreA2dpAndRestartBt()` 写 `2048`（关闭 Source，保留 Sink） |
+| 移除死代码 | 删除 `disableA2dpAndRestartBt` / `originalProfilesValue` / `a2dpDisabled` / `A2DP_ALL_ENABLED` |
+| 清除连接加转圈 | `resetBluetoothStackToApplyHidOnly` 调用 `onBtRestartState`，`isBtResetting` 抑制"失败"提示 |
+| 退出键盘按钮 | 黄色"退出键盘"按钮，确认弹窗 → disconnect → restore(2048) → finish |
+| 版本号 | v1.0.44 |
+
+**验证结果：**
+- 进入 APP → `putInt(2052)` → A2DP Source+Sink 双禁用 ✅（无需重启蓝牙）
+- 退出 APP → `putInt(2048)` → A2DP Source 恢复，Sink 仍禁用 ✅
+
 ### 8.4 音频 Profile 禁用 (per-device)
 
 ```

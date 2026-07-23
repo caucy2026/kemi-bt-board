@@ -26,8 +26,8 @@ class BluetoothHidManager(private val context: Context, var listener: HidStateLi
         const val MODE_WIN = 2
 
         // A2DP profile bitmask (per a2dp.md): Sink=4, Source=2048, Both=2052
-        private const val A2DP_BOTH_DISABLED = 2052L
-        private const val A2DP_ALL_ENABLED = 0L
+        private const val A2DP_BOTH_DISABLED = 2052
+        private const val A2DP_SOURCE_DISABLED = 2048  // exit: disable Source only, re-enable Sink
         private const val A2DP_DYNAMIC_PROP = "persist.sys_im.blutooth.is_a2dp_dynamic"
 
         // Standard Keyboard + Mouse HID Report Descriptor
@@ -120,31 +120,43 @@ class BluetoothHidManager(private val context: Context, var listener: HidStateLi
     @Volatile
     private var isBtResetting = false  // true during clear/reset to suppress transient failure UI
 
-    // A2DP state
-    private var originalProfilesValue: String? = null
-    @Volatile private var a2dpDisabled = false
-
     private val executor = Executors.newSingleThreadExecutor()
 
     init {
+        // Step 1: MUST set dynamic switch BEFORE writing disabled_profiles (per a2dp.md)
+        try {
+            val sp = Class.forName("android.os.SystemProperties")
+            sp.getMethod("set", String::class.java, String::class.java)
+                .invoke(null, A2DP_DYNAMIC_PROP, "true")
+            Log.d(TAG, "SystemProperties.set $A2DP_DYNAMIC_PROP = true")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to set $A2DP_DYNAMIC_PROP: ${e.message}")
+        }
+
+        // Step 2: Write disabled_profiles bitmask + CoD + disable audio via reflection
         enforceSystemHidOnlyConfiguration()
-        disableA2dpAndRestartBt()
+
+        // Step 3: Init HID profile proxy (NO BT restart on enter)
+        initProfileProxy()
     }
 
     fun enforceSystemHidOnlyConfiguration() {
         try {
             val cr = context.contentResolver
-            // 1. Permanently disable audio profiles (HFP=1, A2DP=2, A2DP_SINK=11, AVRCP=12, HFP_CLIENT=16) in system settings
-            android.provider.Settings.Global.putString(cr, "bluetooth_disabled_profiles", "1,2,11,12,16")
-            Log.d(TAG, "Settings.Global: Set bluetooth_disabled_profiles to 1,2,11,12,16")
+            // 1. Disable A2DP via bitmask 2052 (per a2dp.md: Sink=4 + Source=2048)
+            android.provider.Settings.Global.putInt(cr, "bluetooth_disabled_profiles", A2DP_BOTH_DISABLED)
+            val verify = android.provider.Settings.Global.getInt(cr, "bluetooth_disabled_profiles", -1)
+            Log.d(TAG, "putInt bluetooth_disabled_profiles=$A2DP_BOTH_DISABLED, read back=$verify")
+            if (verify != A2DP_BOTH_DISABLED) {
+                Log.e(TAG, "FAILED to verify bluetooth_disabled_profiles! wrote=$A2DP_BOTH_DISABLED, got=$verify")
+            }
             
-            // 2. Force system global Class of Device to Keyboard Peripheral (0x000540 = 1344)
+            // 2. Force system global Class of Device to Keyboard Peripheral (0x000540)
             android.provider.Settings.Global.putInt(cr, "bluetooth_class_of_device", 0x000540)
             android.provider.Settings.Global.putInt(cr, "bluetooth_device_class", 0x000540)
-            Log.d(TAG, "Settings.Global: Set bluetooth_class_of_device to 0x000540 (Keyboard)")
-            listener?.onLog("System HID-Only profile lock & 0x000540 Keyboard CoD applied")
+            Log.d(TAG, "putInt bluetooth_class_of_device = 0x000540 (Keyboard)")
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to update Settings.Global for HID-only configuration", e)
+            Log.e(TAG, "enforceSystemHidOnlyConfiguration failed: ${e.message}", e)
         }
         
         // 3. Attempt to invoke hidden BluetoothAdapter APIs to disable audio profiles
@@ -166,61 +178,14 @@ class BluetoothHidManager(private val context: Context, var listener: HidStateLi
         setLocalBluetoothClassToKeyboardMouse()
     }
 
-    // ===== A2DP disable (per a2dp.md): setprop + settings put 2052 + BT OFF/ON (NO force-stop) =====
-    fun disableA2dpAndRestartBt() {
-        // Step 0: set dynamic profile switching property
-        try {
-            Runtime.getRuntime().exec(arrayOf("setprop", A2DP_DYNAMIC_PROP, "true"))
-            Log.d(TAG, "setprop $A2DP_DYNAMIC_PROP = true")
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to setprop $A2DP_DYNAMIC_PROP", e)
-        }
-
-        val cr = context.contentResolver
-        val current = android.provider.Settings.Global.getString(cr, "bluetooth_disabled_profiles")
-        val targetValue = A2DP_BOTH_DISABLED.toString()  // "2052"
-
-        if (current == targetValue) {
-            Log.d(TAG, "A2DP already disabled (='$current'), skip BT restart")
-            initProfileProxy()
-            return
-        }
-        if (a2dpDisabled) { Log.d(TAG, "A2DP disable in progress, skip"); return }
-
-        // Save original value for later restore
-        originalProfilesValue = current ?: A2DP_ALL_ENABLED.toString()
-        Log.d(TAG, "disableA2dp: save orig='$originalProfilesValue', writing target='$targetValue'")
-
-        // Write target via putString (matches 'settings put global' format)
-        android.provider.Settings.Global.putString(cr, "bluetooth_disabled_profiles", targetValue)
-        val verify = android.provider.Settings.Global.getString(cr, "bluetooth_disabled_profiles")
-        Log.d(TAG, "disableA2dp: wrote '$targetValue', read back='$verify'")
-        if (verify != targetValue) {
-            Log.e(TAG, "disableA2dp: FAILED to write! Read back '$verify'")
-            initProfileProxy()
-            return
-        }
-
-        a2dpDisabled = true
-        context.getSharedPreferences("kboard_bt_state", Context.MODE_PRIVATE).edit()
-            .putString("a2dp_original", originalProfilesValue)
-            .putBoolean("a2dp_dirty_shutdown", true)
-            .apply()
-
-        listener?.onLog("A2DP已关闭(bitmask=2052)，正在重启蓝牙...")
-        performBtOffOnCycle()
-    }
-
     fun restoreA2dpAndRestartBt() {
-        val restoreVal = originalProfilesValue ?: A2DP_ALL_ENABLED.toString()
-        val cr = context.contentResolver
-        android.provider.Settings.Global.putString(cr, "bluetooth_disabled_profiles", restoreVal)
-        Log.d(TAG, "restoreA2dp: wrote '$restoreVal'")
-
-        a2dpDisabled = false
-        context.getSharedPreferences("kboard_bt_state", Context.MODE_PRIVATE).edit()
-            .putBoolean("a2dp_dirty_shutdown", false)
-            .apply()
+        try {
+            val cr = context.contentResolver
+            android.provider.Settings.Global.putInt(cr, "bluetooth_disabled_profiles", A2DP_SOURCE_DISABLED)
+            Log.d(TAG, "restoreA2dp: putInt bluetooth_disabled_profiles=$A2DP_SOURCE_DISABLED (disable Source, keep Sink)")
+        } catch (e: Exception) {
+            Log.e(TAG, "restoreA2dp failed: ${e.message}", e)
+        }
     }
 
     private fun performBtOffOnCycle() {
@@ -241,9 +206,6 @@ class BluetoothHidManager(private val context: Context, var listener: HidStateLi
                 Log.d(TAG, "BT ON done (state=${adapter.state})"); Thread.sleep(1500)
 
                 enforceSystemHidOnlyConfiguration()
-                // Re-apply A2DP disable after enforceSystemHidOnlyConfiguration overwrites it
-                android.provider.Settings.Global.putString(context.contentResolver, "bluetooth_disabled_profiles", A2DP_BOTH_DISABLED.toString())
-                Log.d(TAG, "Re-applied bluetooth_disabled_profiles = $A2DP_BOTH_DISABLED")
                 initProfileProxy()
                 listener?.onBtRestartState(false)
             } catch (e: Exception) {

@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KEMI 蓝牙设备扫描</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,'Segoe UI',sans-serif;background:#0f172a;color:#e2e8f0;min-height:100vh;padding:16px}
+h1{text-align:center;font-size:20px;margin-bottom:4px;color:#38bdf8}
+.sub{text-align:center;font-size:12px;color:#64748b;margin-bottom:16px}
+.card{background:#1e293b;border-radius:12px;padding:16px;margin-bottom:12px;border:1px solid #334155}
+.btn{display:inline-block;padding:10px 20px;border:none;border-radius:8px;font-size:14px;cursor:pointer;font-weight:600;width:100%}
+.btn-blue{background:#0284c7;color:#fff}.btn-blue:hover{background:#0369a1}.btn-blue:disabled{background:#334155;color:#64748b;cursor:not-allowed}
+.status{text-align:center;padding:8px;font-size:13px;color:#94a3b8}
+.warn-box{background:#422006;border:1px solid #f59e0b;border-radius:8px;padding:12px;margin-bottom:12px;font-size:13px;line-height:1.6}
+.warn-box b{color:#f59e0b}
+.device-row{display:flex;align-items:center;gap:10px;padding:10px;background:#0f172a;border-radius:8px;margin-bottom:4px}
+.device-row.kemi{border:1px solid #f59e0b;background:#1e1b0f}
+.device-icon{font-size:24px;width:36px;text-align:center}
+.device-info{flex:1}.device-name{font-size:14px;font-weight:600}.device-name.kemi{color:#f59e0b}
+.device-detail{font-size:11px;color:#94a3b8;margin-top:2px}
+.tag{display:inline-block;padding:2px 7px;border-radius:4px;font-size:10px;font-weight:600}
+.tag-ble{background:#38bdf8;color:#0f172a}.tag-classic{background:#f59e0b;color:#1e293b}
+.log-box{max-height:200px;overflow-y:auto;font-family:Consolas,monospace;font-size:11px;color:#94a3b8;background:#0f172a;padding:10px;border-radius:8px;line-height:1.5}
+.log-box .e{color:#f87171}.log-box .w{color:#fbbf24}.log-box .i{color:#38bdf8}.log-box .s{color:#4ade80}
+</style>
+</head>
+<body>
+
+<h1>🔍 KEMI 蓝牙设备扫描</h1>
+<p class="sub">Web Bluetooth API — 仅支持 BLE</p>
+
+<div id="noBt" style="display:none;text-align:center;padding:40px;color:#f87171">
+  <p style="font-size:40px">🚫</p><p>浏览器不支持 Web Bluetooth API</p>
+  <p style="font-size:12px;color:#64748b">请用 Chrome / Edge 打开</p>
+</div>
+
+<div id="app" style="display:none">
+
+  <div class="warn-box">
+    <b>⚠️ 结论：网页扫不到 KEMI-KB</b><br>
+    Web Bluetooth API 只能扫描 <b>BLE（低功耗蓝牙）</b>设备。<br>
+    <b>KEMI-KB-72A2</b> 是 <b>经典蓝牙 HID 键盘</b>，BLE 扫描器看不到它。<br>
+    下方是通过 adb 读取的真实设备参数。
+  </div>
+
+  <!-- KEMI device info from adb -->
+  <div class="card">
+    <div style="font-weight:600;margin-bottom:8px">📡 KEMI 设备参数（adb 读取）</div>
+    <div class="device-row kemi">
+      <div class="device-icon">⌨️</div>
+      <div class="device-info">
+        <div class="device-name kemi">KEMI-KB-72A2</div>
+        <div class="device-detail">MAC: A4:6B:40:17:72:A3 | Class: 0x540 (Keyboard Peripheral)</div>
+        <div class="device-detail">ScanMode: CONNECTABLE_DISCOVERABLE | Profile: HidDeviceService</div>
+        <div class="device-detail">A2DP Source: Disabled | A2DP Sink: Disabled</div>
+      </div>
+      <span class="tag tag-classic">经典蓝牙</span>
+    </div>
+  </div>
+
+  <!-- BLE only scan -->
+  <div class="card">
+    <button class="btn btn-blue" id="btnScan" onclick="doScan()">🔍 扫描附近 BLE 设备（验证用）</button>
+    <p class="status" id="status">点击后浏览器弹出系统设备选择窗口</p>
+  </div>
+
+  <div class="card">
+    <div style="font-weight:600;margin-bottom:6px">📱 扫描结果 (<span id="count">0</span>)</div>
+    <div id="list"><p style="color:#64748b;text-align:center;padding:10px">尚未扫描<br><small>KEMI-KB 是经典蓝牙，不会出现在列表中</small></p></div>
+  </div>
+
+  <div class="card">
+    <div style="font-weight:600;margin-bottom:6px">📋 日志</div>
+    <div class="log-box" id="log"></div>
+  </div>
+</div>
+
+<script>
+if (!navigator.bluetooth) { document.getElementById('noBt').style.display='block'; }
+else { document.getElementById('app').style.display='block'; }
+
+const found = [];
+function L(m,c){const e=document.getElementById('log');e.innerHTML+=`<span class="${c}">[${new Date().toLocaleTimeString()}] ${m}</span><br>`;e.scrollTop=e.scrollHeight}
+
+async function doScan(){
+  const btn=document.getElementById('btnScan');
+  const st=document.getElementById('status');
+  btn.disabled=true; found.length=0; document.getElementById('log').innerHTML='';
+  renderList();
+  L('=== BLE 扫描开始 ===','i');
+  L('Web BT API 只能发现 BLE 设备','w');
+  L('经典蓝牙(Classic BT)设备不会出现在结果中','w');
+
+  st.textContent='请在弹出的蓝牙设备列表中选择任意设备...';
+  try {
+    const dev = await navigator.bluetooth.requestDevice({
+      acceptAllDevices: true,
+      optionalServices: []
+    });
+    const name = dev.name || '(无名称)';
+    L(`用户选中: ${name} | ID: ${dev.id}`,'s');
+    found.push({name, id:dev.id, type:'selected'});
+    try { dev.gatt?.disconnect(); } catch(e){}
+  } catch(e) {
+    if (e.name==='NotFoundError') L('用户取消或未选择设备','w');
+    else L(`错误: ${e.message}`,'e');
+  }
+
+  L(`=== 扫描结束: ${found.length} 个设备 ===`,'i');
+  renderList();
+  st.textContent='扫描完成';
+  btn.disabled=false;
+}
+
+function renderList(){
+  document.getElementById('count').textContent = found.length;
+  const el = document.getElementById('list');
+  if (found.length===0) {
+    el.innerHTML='<p style="color:#64748b;text-align:center;padding:10px">未发现 BLE 设备<br><small>KEMI-KB 是经典蓝牙 HID，不会出现在此</small></p>';
+    return;
+  }
+  el.innerHTML = found.map(d =>
+    `<div class="device-row">
+      <div class="device-icon">📱</div>
+      <div class="device-info">
+        <div class="device-name">${d.name}</div>
+        <div class="device-detail">${d.id} | ${d.type}</div>
+      </div>
+      <span class="tag tag-ble">BLE</span>
+    </div>`
+  ).join('');
+}
+
+L('页面就绪','i');
+L('KEMI-KB = 经典蓝牙 HID → Web BT API 不可见','w');
+</script>
+</body>
+</html>
