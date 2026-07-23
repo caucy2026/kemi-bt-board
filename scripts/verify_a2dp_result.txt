@@ -1,0 +1,8 @@
+KEMI A2DP Verify - 2026-07-23 14:42:35
+Device: 192.168.3.46
+profiles_before=2052
+profiles_after=2052
+prop_before=true
+prop_after=true
+check_profiles_2052=True
+check_prop_true=True

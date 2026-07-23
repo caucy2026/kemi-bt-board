@@ -11,8 +11,8 @@ android {
         applicationId = "com.kboard"
         minSdk = 31
         targetSdk = 34
-        versionCode = 28
-        versionName = "1.0.28"
+        versionCode = 40
+        versionName = "1.0.40"
     }
 
     signingConfigs {

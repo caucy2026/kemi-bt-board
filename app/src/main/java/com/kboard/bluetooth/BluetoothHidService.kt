@@ -178,4 +178,15 @@ class BluetoothHidService : Service() {
         hidManager?.unregister()
         hidManager = null
     }
+
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        super.onTaskRemoved(rootIntent)
+        Log.d("BluetoothHidService", "onTaskRemoved: actively disconnecting from host")
+        // Restore A2DP profiles before disconnect
+        hidManager?.restoreA2dpAndRestartBt()
+        // Send HID disconnect so Mac knows keyboard is offline
+        hidManager?.disconnectFromHost()
+        // Stop self so notification goes away
+        stopSelf()
+    }
 }

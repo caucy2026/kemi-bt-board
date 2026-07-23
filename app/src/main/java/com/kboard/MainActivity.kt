@@ -37,6 +37,7 @@ class MainActivity : AppCompatActivity(), BluetoothHidManager.HidStateListener, 
     }
 
     private lateinit var statusText: TextView
+    private lateinit var btRestartSpinner: android.widget.ProgressBar
     private lateinit var btNameText: TextView
     private lateinit var transcriptText: TextView
     private lateinit var micButton: Button
@@ -54,6 +55,7 @@ class MainActivity : AppCompatActivity(), BluetoothHidManager.HidStateListener, 
     private lateinit var btnModeMac: Button
     private lateinit var btnModeWin: Button
     private lateinit var btnRetryBluetooth: Button
+    private lateinit var btnExit: Button
     private lateinit var hintTextView: TextView
     private lateinit var macButtonsLayout: android.widget.LinearLayout
     private lateinit var btnBypassMac: Button
@@ -81,6 +83,7 @@ class MainActivity : AppCompatActivity(), BluetoothHidManager.HidStateListener, 
     private var isManualDisconnect = false
     private var reconnectRetryCount = 0
     private var isFirstMacAsrSend = true
+    private var isExiting = false  // true when exiting via button → skip onDestroy duplicate cleanup
 
     private val serviceConnection = object : android.content.ServiceConnection {
         override fun onServiceConnected(name: android.content.ComponentName?, service: IBinder?) {
@@ -125,6 +128,7 @@ class MainActivity : AppCompatActivity(), BluetoothHidManager.HidStateListener, 
 
         // Initialize UI Elements
         statusText = findViewById(R.id.statusText)
+        btRestartSpinner = findViewById(R.id.btRestartSpinner)
         btNameText = findViewById(R.id.btNameText)
         transcriptText = findViewById(R.id.transcriptText)
         micButton = findViewById(R.id.micButton)
@@ -149,6 +153,7 @@ class MainActivity : AppCompatActivity(), BluetoothHidManager.HidStateListener, 
         btnModeMac = findViewById(R.id.btnModeMac)
         btnModeWin = findViewById(R.id.btnModeWin)
         btnRetryBluetooth = findViewById(R.id.btnRetryBluetooth)
+        btnExit = findViewById(R.id.btnExit)
         hintTextView = findViewById(R.id.hintText)
         macButtonsLayout = findViewById(R.id.macButtonsLayout)
         btnBypassMac = findViewById(R.id.btnBypassMac)
@@ -415,6 +420,30 @@ class MainActivity : AppCompatActivity(), BluetoothHidManager.HidStateListener, 
             btnRetryBluetooth.visibility = android.view.View.GONE
             statusText.text = "状态: 正在重新初始化蓝牙..."
             btService?.hidManager?.reinitProfileProxy()
+        }
+
+        btnExit.setOnClickListener {
+            androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle("确认退出")
+                .setMessage("退出后将断开蓝牙连接并恢复音频设置。确定退出吗？")
+                .setPositiveButton("确定退出") { _, _ ->
+                    isExiting = true
+                    statusText.text = "状态: 正在断开连接..."
+                    // 1. Disconnect HID from host
+                    btService?.hidManager?.disconnectFromHost()
+                    // 2. Restore A2DP settings (no BT restart)
+                    btService?.hidManager?.restoreA2dpAndRestartBt()
+                    // 3. Stop service and finish
+                    stopReconnectLoop()
+                    if (isBound) {
+                        unbindService(serviceConnection)
+                        isBound = false
+                    }
+                    stopService(android.content.Intent(this, BluetoothHidService::class.java))
+                    finishAffinity()
+                }
+                .setNegativeButton("取消", null)
+                .show()
         }
 
         // Initialize UI with saved mode
@@ -854,6 +883,23 @@ class MainActivity : AppCompatActivity(), BluetoothHidManager.HidStateListener, 
             runOnUiThread {
                 btnRetryBluetooth.visibility = android.view.View.VISIBLE
                 statusText.text = "状态: 蓝牙 HID 代理失败，请点击右侧【刷新重试】"
+            }
+        }
+    }
+
+    override fun onBtRestartState(isRestarting: Boolean) {
+        runOnUiThread {
+            if (isRestarting) {
+                btRestartSpinner.visibility = android.view.View.VISIBLE
+                statusText.text = "状态: 正在重启蓝牙..."
+            } else {
+                btRestartSpinner.visibility = android.view.View.GONE
+                val connectedDev = btService?.hidManager?.connectedDevice
+                statusText.text = if (connectedDev != null) {
+                    "状态: 已连接至主机 [${connectedDev.name ?: connectedDev.address}]"
+                } else {
+                    "状态: 蓝牙就绪，等待配对连接"
+                }
             }
         }
     }
@@ -1333,9 +1379,15 @@ class MainActivity : AppCompatActivity(), BluetoothHidManager.HidStateListener, 
     }
 
     override fun onDestroy() {
+        if (isExiting) {
+            super.onDestroy()
+            return
+        }
         isManualDisconnect = true
         stopReconnectLoop()
         super.onDestroy()
+        // Restore A2DP profiles before disconnect
+        btService?.hidManager?.restoreA2dpAndRestartBt()
         // Actively disconnect from host so Mac/PC knows the keyboard has gone offline
         btService?.hidManager?.disconnectFromHost()
         if (isBound) {
