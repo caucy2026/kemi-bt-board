@@ -1,6 +1,6 @@
 # KEMI 语音键盘 — 蓝牙控制流程完整文档
 
-> 版本: v1.0.40 | 包名: `com.kboard` | 系统签名: `android.uid.system`
+> 版本: v1.1.0 | 包名: `com.kboard` | 系统签名: `android.uid.system`
 > 最后更新: 2026-07-23
 
 ---

@@ -763,49 +763,38 @@ class BluetoothHidManager(private val context: Context, var listener: HidStateLi
         try { Thread.sleep(10) } catch (e: Exception) {}
     }
 
-    // Sends a Unicode character on Windows using Alt + Numpad + + 4 Hex digits
+    // Sends a Unicode character on Windows using Alt + Numpad+ + Hex (requires EnableHexNumpad=1)
+    // Alt must be held continuously; standard letter keys (a-f) are accepted by Windows hex input
     private fun sendUnicodeCharacterWin(char: Char) {
-        val hex = char.code.toString(16).padStart(4, '0').lowercase()
-        val altMod: Byte = 0x04 // Left Alt
-        val keypadPlus: Byte = 0x57 // Keypad +
+        val hex = char.code.toString(16).padStart(4, '0').lowercase()  // e.g. "4e2d"
+        val altMod: Byte = 0x04
         
-        // 1. Hold Alt
-        sendKeyboardReport(altMod, byteArrayOf(0))
-        try { Thread.sleep(15) } catch (e: Exception) {}
+        // 1. Hold Alt + press Numpad+ to start hex input
+        sendKeyboardReport(altMod, byteArrayOf())
+        try { Thread.sleep(15) } catch (_: Exception) {}
+        sendKeyboardReport(altMod, byteArrayOf(0x57))  // Keypad +
+        try { Thread.sleep(15) } catch (_: Exception) {}
+        sendKeyboardReport(altMod, byteArrayOf())       // release +, keep Alt
+        try { Thread.sleep(15) } catch (_: Exception) {}
         
-        // 2. Press Keypad +
-        sendKeyboardReport(altMod, byteArrayOf(keypadPlus))
-        try { Thread.sleep(12) } catch (e: Exception) {}
-        sendKeyboardReport(altMod, byteArrayOf(0))
-        try { Thread.sleep(12) } catch (e: Exception) {}
-        
-        // 3. Type 4 hex digits (Windows requires numpad keys for digits 0-9)
-        for (hexChar in hex) {
-            val scancode: Byte = when (hexChar) {
-                in '0'..'9' -> {
-                    if (hexChar == '0') {
-                        0x62.toByte() // Keypad 0
-                    } else {
-                        (0x59 + (hexChar - '1')).toByte() // Keypad 1-9
-                    }
-                }
-                in 'a'..'f' -> {
-                    (0x04 + (hexChar - 'a')).toByte() // Standard a-f
-                }
+        // 2. Type hex digits (standard keys for a-f, numpad keys for 0-9)
+        for (ch in hex) {
+            val sc = when (ch) {
+                '0' -> 0x62  // Keypad 0
+                in '1'..'9' -> 0x59 + (ch - '1')  // Keypad 1-9
+                'a' -> 0x04; 'b' -> 0x05; 'c' -> 0x06  // standard keys for hex a-f
+                'd' -> 0x07; 'e' -> 0x08; 'f' -> 0x09
                 else -> continue
             }
-            
-            // Press digit
-            sendKeyboardReport(altMod, byteArrayOf(scancode))
-            try { Thread.sleep(10) } catch (e: Exception) {}
-            // Release digit, keep Alt
-            sendKeyboardReport(altMod, byteArrayOf(0))
-            try { Thread.sleep(10) } catch (e: Exception) {}
+            sendKeyboardReport(altMod, byteArrayOf(sc.toByte()))
+            try { Thread.sleep(10) } catch (_: Exception) {}
+            sendKeyboardReport(altMod, byteArrayOf())  // release key, keep Alt
+            try { Thread.sleep(10) } catch (_: Exception) {}
         }
         
-        // 4. Release Alt
-        sendKeyboardReport(0, byteArrayOf(0))
-        try { Thread.sleep(15) } catch (e: Exception) {}
+        // 3. Release Alt to commit the character
+        sendKeyboardReport(0, byteArrayOf())
+        try { Thread.sleep(15) } catch (_: Exception) {}
     }
 
     // Sends a Unicode string by splitting ASCII and Unicode characters
@@ -861,6 +850,9 @@ class BluetoothHidManager(private val context: Context, var listener: HidStateLi
                 sendKeyboardReport(0, byteArrayOf(0))
                 try { Thread.sleep(25) } catch (e: Exception) {} // Increased to 25ms
             }
+            // Safety: always release all modifiers after Unicode string (prevents stuck Alt/Ctrl on Windows)
+            sendKeyboardReport(0, byteArrayOf())
+            try { Thread.sleep(10) } catch (e: Exception) {}
         }
     }
 

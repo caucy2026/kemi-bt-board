@@ -23,53 +23,7 @@ class XunfeiCredentialProvider {
         val apiKey: String
     )
 
-    // Call 1: Apply for credentials from local endpoint
-    fun applyCredentials(mac: String): Credentials? {
-        val url = "http://www.newlinksz.cn/chat/voice/xunfei/apply"
-        val cleanMac = mac.lowercase()
-        val requestJson = JSONObject().apply {
-            put("ai_type", "aiagent")
-            put("sn", "QUALMETA-${mac.uppercase()}")
-            put("project_id", "KEMI_7M600_T1")
-            put("macaddr", cleanMac)
-            put("system_version", "V1.0.0.1:2026-06-09:1.0.1")
-        }
-
-        val request = Request.Builder()
-            .url(url)
-            .post(requestJson.toString().toRequestBody(JSON_MEDIA_TYPE))
-            .build()
-
-        try {
-            client.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) {
-                    Log.e(TAG, "Apply credentials failed: HTTP ${response.code}")
-                    return null
-                }
-                val bodyStr = response.body?.string() ?: return null
-                Log.d(TAG, "Apply Response: $bodyStr")
-                val json = JSONObject(bodyStr)
-
-                // The JSON can contain a nested "xunfei" object or flat keys
-                val xunfeiObj = json.optJSONObject("xunfei")
-                val token = xunfeiObj?.optString("token") ?: json.optString("xunfei.token") ?: json.optString("token")
-                val appId = xunfeiObj?.optString("app_id") ?: json.optString("xunfei.app_id") ?: json.optString("app_id")
-                val apiKey = xunfeiObj?.optString("api_key") ?: json.optString("xunfei.api_key") ?: json.optString("api_key")
-
-                if (token.isEmpty() || appId.isEmpty() || apiKey.isEmpty()) {
-                    Log.e(TAG, "Missing credentials in response: token=$token, appId=$appId, apiKey=$apiKey")
-                    return null
-                }
-
-                return Credentials(token, appId, apiKey)
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Error applying credentials", e)
-            return null
-        }
-    }
-
-    // Call 2: Auth with Xunfei service
+    // HTTP Auth with Xunfei service (per iflytek_asr_interface_doc.md §3)
     fun authenticate(mac: String, token: String): Boolean {
         val url = "http://api.voice.gskiot.com/voice-api/voice/auth"
         val timestamp = System.currentTimeMillis().toString()

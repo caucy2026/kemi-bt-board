@@ -114,10 +114,6 @@ class MainActivity : AppCompatActivity(), BluetoothHidManager.HidStateListener, 
     private var voiceController: VoiceInputController? = null
     private var asrClient: IflytekASRClient? = null
     private var credentialProvider = XunfeiCredentialProvider()
-    
-    // Cached credentials
-    private var cachedCredentials: XunfeiCredentialProvider.Credentials? = null
-    
     private var wifiMacAddress = "02:00:00:00:00:00"
     private val mainHandler = Handler(Looper.getMainLooper())
     private val networkExecutor = Executors.newSingleThreadExecutor()
@@ -358,9 +354,9 @@ class MainActivity : AppCompatActivity(), BluetoothHidManager.HidStateListener, 
                 // Control + Space (Ctrl=0x01, Space=0x2C)
                 btService?.hidManager?.sendKeystroke(0x01.toByte(), 0x2C.toByte(), 100L)
             } else if (currentInputMode == BluetoothHidManager.MODE_WIN) {
-                Log.d(TAG, "Manual switch input source on Win: Sending Alt+Shift...")
-                // Left Alt + Left Shift (Shift=0x02, Alt=0x04 => 0x06)
-                btService?.hidManager?.sendKeystroke(0x06.toByte(), 0x00.toByte(), 80L)
+                Log.d(TAG, "Manual switch input source on Win: Sending Ctrl+Space...")
+                // Windows: Ctrl+Space (same as Mac/Pinyin)
+                btService?.hidManager?.sendKeystroke(0x01.toByte(), 0x2C.toByte(), 80L)
             } else {
                 Log.d(TAG, "Manual switch input source in Pinyin mode: Sending Ctrl+Space...")
                 btService?.hidManager?.sendKeystroke(0x01.toByte(), 0x2C.toByte(), 100L)
@@ -512,64 +508,53 @@ class MainActivity : AppCompatActivity(), BluetoothHidManager.HidStateListener, 
         
         networkExecutor.execute {
             try {
-                // Step 1: Get/apply credentials (memory cache -> local cache -> server)
-                var creds = cachedCredentials ?: getLocalCredentials()
-                if (creds == null) {
-                    Log.d(TAG, "No cached credentials found, requesting from server...")
-                    val fresh = credentialProvider.applyCredentials(wifiMacAddress)
-                    if (fresh != null) {
-                        saveLocalCredentials(fresh)
-                        creds = fresh
+                // Step 1: Read credentials from system-level cache (Settings.Global, per iflytek_asr_interface_doc.md)
+                val cr = contentResolver
+                val paramsJson = android.provider.Settings.Global.getString(cr, "iflytek_params")
+                if (paramsJson.isNullOrEmpty()) {
+                    runOnUiThread {
+                        transcriptText.text = "错误: 未找到讯飞 ASR 缓存参数 (iflytek_params)"
+                        micButton.text = "按住说话"
                     }
+                    return@execute
                 }
                 
-                if (creds == null) {
+                val params = org.json.JSONObject(paramsJson)
+                val token  = params.optString("token", "")
+                val appId  = params.optString("app_id", "")
+                val apiKey = params.optString("api_key", "")
+                val wifiMac = params.optString("wifi_mac", wifiMacAddress)
+                
+                if (token.isEmpty() || appId.isEmpty() || apiKey.isEmpty()) {
                     runOnUiThread {
-                        transcriptText.text = "错误: 无法获取讯飞 ASR 凭证"
+                        transcriptText.text = "错误: 讯飞 ASR 缓存参数不完整 (token/app_id/api_key)"
                         micButton.text = "按住说话"
                     }
                     return@execute
                 }
-                cachedCredentials = creds
-
-                // Step 2: Complete session authentication
-                var authSuccess = credentialProvider.authenticate(wifiMacAddress, creds.token)
-                if (!authSuccess) {
-                    Log.w(TAG, "Cached token authentication failed. Clearing cache and retrying...")
-                    runOnUiThread {
-                        transcriptText.text = "提示: 本地密钥已过期，正在重新向云端申请新密钥..."
-                    }
-                    clearLocalCredentials()
-                    cachedCredentials = null
-                    
-                    val fresh = credentialProvider.applyCredentials(wifiMacAddress)
-                    if (fresh != null) {
-                        saveLocalCredentials(fresh)
-                        cachedCredentials = fresh
-                        creds = fresh
-                        runOnUiThread {
-                            transcriptText.text = "提示: 密钥已重新拉取，正在鉴权重新连接..."
-                        }
-                        authSuccess = credentialProvider.authenticate(wifiMacAddress, creds.token)
-                    }
-                }
-
+                
+                val creds = XunfeiCredentialProvider.Credentials(token, appId, apiKey)
+                Log.d(TAG, "Read ASR credentials from Settings.Global.iflytek_params")
+                
+                // Step 2: HTTP auth (required per iflytek_asr_interface_doc.md §3)
+                runOnUiThread { transcriptText.text = "正在鉴权..." }
+                val authSuccess = credentialProvider.authenticate(wifiMac, token)
                 if (!authSuccess) {
                     runOnUiThread {
-                        transcriptText.text = "错误: 讯飞 ASR 鉴权失败"
+                        transcriptText.text = "错误: 讯飞 ASR 鉴权失败，请检查网络或缓存参数"
                         micButton.text = "按住说话"
                     }
                     return@execute
                 }
-
+                
                 // Step 3: Establish streaming WebSocket client
-                asrClient = IflytekASRClient(creds, wifiMacAddress, this@MainActivity)
+                asrClient = IflytekASRClient(creds, wifiMac, this@MainActivity)
                 asrClient?.start()
-
+                
             } catch (e: Exception) {
-                Log.e(TAG, "Error in ASR setup thread", e)
+                Log.e(TAG, "Error in ASR setup", e)
                 runOnUiThread {
-                    transcriptText.text = "发生异常: ${e.message}"
+                    transcriptText.text = "ASR 异常: ${e.message}"
                     micButton.text = "按住说话"
                 }
             }
@@ -839,6 +824,8 @@ class MainActivity : AppCompatActivity(), BluetoothHidManager.HidStateListener, 
         runOnUiThread {
             when (state) {
                 BluetoothProfile.STATE_CONNECTED -> {
+                    btRestartSpinner.visibility = android.view.View.GONE
+                    btRestartSpinner.visibility = android.view.View.GONE
                     statusText.text = "状态: 已连接至主机 [${device?.name ?: device?.address}]"
                     stopReconnectLoop()
                 }
@@ -859,6 +846,7 @@ class MainActivity : AppCompatActivity(), BluetoothHidManager.HidStateListener, 
     override fun onAppRegistered(registered: Boolean) {
         runOnUiThread {
             if (registered) {
+                btRestartSpinner.visibility = android.view.View.GONE
                 btnRetryBluetooth.visibility = android.view.View.GONE
                 val connectedDev = btService?.hidManager?.connectedDevice
                 if (connectedDev != null) {
@@ -999,32 +987,6 @@ class MainActivity : AppCompatActivity(), BluetoothHidManager.HidStateListener, 
             android.view.ViewGroup.LayoutParams.WRAP_CONTENT
         )
         dialog.show()
-    }
-
-    private fun getLocalCredentials(): XunfeiCredentialProvider.Credentials? {
-        val prefs = getSharedPreferences("xunfei_prefs", android.content.Context.MODE_PRIVATE)
-        val appId = prefs.getString("app_id", null)
-        val apiKey = prefs.getString("api_key", null)
-        val token = prefs.getString("token", null)
-        if (appId != null && apiKey != null && token != null && appId.isNotEmpty() && apiKey.isNotEmpty() && token.isNotEmpty()) {
-            return XunfeiCredentialProvider.Credentials(token, appId, apiKey)
-        }
-        return null
-    }
-
-    private fun saveLocalCredentials(creds: XunfeiCredentialProvider.Credentials) {
-        val prefs = getSharedPreferences("xunfei_prefs", android.content.Context.MODE_PRIVATE)
-        prefs.edit().apply {
-            putString("app_id", creds.appId)
-            putString("api_key", creds.apiKey)
-            putString("token", creds.token)
-            apply()
-        }
-    }
-
-    private fun clearLocalCredentials() {
-        val prefs = getSharedPreferences("xunfei_prefs", android.content.Context.MODE_PRIVATE)
-        prefs.edit().clear().apply()
     }
 
     private fun updateGlobalKeyboardLabels(mode: Int) {
