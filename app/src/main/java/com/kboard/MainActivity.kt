@@ -22,6 +22,7 @@ import com.kboard.asr.VoiceInputController
 import com.kboard.asr.XunfeiCredentialProvider
 import com.kboard.bluetooth.BluetoothHidManager
 import com.kboard.bluetooth.KeycodeTranslator
+import com.kboard.net.WinInstallServer
 import com.kboard.ui.TouchpadView
 import com.kboard.utils.DeviceMacReader
 import java.util.concurrent.Executors
@@ -67,10 +68,13 @@ class MainActivity : AppCompatActivity(), BluetoothHidManager.HidStateListener, 
     private lateinit var globalKeyboardTitle: TextView
     private lateinit var btnGlobalKeyboardClose: Button
     private lateinit var qwertyKeyboardOverlay: android.widget.LinearLayout
+    private lateinit var btnNumLock: Button
+    private lateinit var numLockIndicator: android.view.View
     private var currentInputMode = BluetoothHidManager.MODE_MAC
     private var activeModifiers: Byte = 0
     private val pressedKeycodes = mutableSetOf<Byte>()
     private var latestSessionText = ""
+    private lateinit var winInstallServer: WinInstallServer
 
     private var btService: BluetoothHidService? = null
     private var isBound = false
@@ -160,6 +164,10 @@ class MainActivity : AppCompatActivity(), BluetoothHidManager.HidStateListener, 
         globalKeyboardOverlay = findViewById(R.id.globalKeyboardOverlay)
         globalKeyboardTitle = findViewById(R.id.globalKeyboardTitle)
         btnGlobalKeyboardClose = findViewById(R.id.btnGlobalKeyboardClose)
+        btnNumLock = findViewById(R.id.btnNumLock)
+        numLockIndicator = findViewById(R.id.numLockIndicator)
+        // 初始化为默认圆灯（灰色 OFF）
+        updateNumLockIndicator(false)
 
         val appTitle = findViewById<TextView>(R.id.appTitle)
         try {
@@ -172,6 +180,7 @@ class MainActivity : AppCompatActivity(), BluetoothHidManager.HidStateListener, 
         // Load input mode from SharedPreferences
         val prefs = getSharedPreferences("kboard_prefs", android.content.Context.MODE_PRIVATE)
         currentInputMode = prefs.getInt("input_mode", BluetoothHidManager.MODE_MAC)
+        winInstallServer = WinInstallServer(applicationContext)
 
         setupInputModeButtons()
 
@@ -496,7 +505,10 @@ class MainActivity : AppCompatActivity(), BluetoothHidManager.HidStateListener, 
                 hintTextView.text = builder
             }
             BluetoothHidManager.MODE_WIN -> {
-                hintTextView.text = "提示: Win直投模式已开启。请确保电脑当前处于【英文输入状态】！未连接时触摸任意按键或屏幕重连。"
+                hintTextView.text = "提示: Win直投模式已开启。需要安装 Windows U+ 助手，点击下方【如何安装 Windows U+ 助手】查看步骤。"
+                if (::winInstallServer.isInitialized) {
+                    winInstallServer.ensureStarted()
+                }
             }
         }
     }
@@ -892,6 +904,20 @@ class MainActivity : AppCompatActivity(), BluetoothHidManager.HidStateListener, 
         }
     }
 
+    override fun onNumLockStateChanged(isOn: Boolean) {
+        runOnUiThread {
+            updateNumLockIndicator(isOn)
+        }
+    }
+
+    private fun updateNumLockIndicator(isOn: Boolean) {
+        if (!::numLockIndicator.isInitialized) return
+        val oval = android.graphics.drawable.GradientDrawable()
+        oval.shape = android.graphics.drawable.GradientDrawable.OVAL
+        oval.setColor(if (isOn) 0xFF00FF00.toInt() else 0xFF555555.toInt())
+        numLockIndicator.background = oval
+    }
+
     // --- Xunfei ASR Client callbacks ---
 
     override fun onStarted() {
@@ -981,9 +1007,53 @@ class MainActivity : AppCompatActivity(), BluetoothHidManager.HidStateListener, 
         closeBtn.setOnClickListener {
             dialog.dismiss()
         }
-        
+
+        val contentText = dialog.findViewById<TextView>(R.id.tvWinGuideContent)
+        winInstallServer.ensureStarted()
+        val primaryUrl = winInstallServer.getPrimaryAccessUrl()
+        val wifiName = winInstallServer.getCurrentWifiName()
+
+        if (wifiName == null || primaryUrl.isNullOrBlank()) {
+            contentText.text = "⚠️ 请确保手机与电脑连接同一个局域网后再试。"
+        } else {
+            val raw = "1. 确保 Windows 电脑已连接 Wi-Fi：$wifiName\n2. 在 Windows 浏览器打开：$primaryUrl\n3. 下载并运行 WinUnicodeIME.exe\n4. （可选）运行 install.ps1 一键安装并注册开机自启\n5. 安装完成后保持助手后台运行即可"
+            val spannable = android.text.SpannableStringBuilder(raw)
+
+            // Highlight Wi-Fi name
+            val wifiStart = raw.indexOf(wifiName)
+            if (wifiStart >= 0) {
+                spannable.setSpan(
+                    android.text.style.ForegroundColorSpan(android.graphics.Color.parseColor("#FFCA28")),
+                    wifiStart, wifiStart + wifiName.length,
+                    android.text.Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+                )
+                spannable.setSpan(
+                    android.text.style.StyleSpan(android.graphics.Typeface.BOLD),
+                    wifiStart, wifiStart + wifiName.length,
+                    android.text.Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+                )
+            }
+
+            // Highlight URL
+            val urlStart = raw.indexOf(primaryUrl)
+            if (urlStart >= 0) {
+                spannable.setSpan(
+                    android.text.style.ForegroundColorSpan(android.graphics.Color.parseColor("#00ADB5")),
+                    urlStart, urlStart + primaryUrl.length,
+                    android.text.Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+                )
+                spannable.setSpan(
+                    android.text.style.StyleSpan(android.graphics.Typeface.BOLD),
+                    urlStart, urlStart + primaryUrl.length,
+                    android.text.Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+                )
+            }
+
+            contentText.text = spannable
+        }
+
         dialog.window?.setLayout(
-            (320 * resources.displayMetrics.density).toInt(),
+            (resources.displayMetrics.widthPixels * 0.6).toInt(),
             android.view.ViewGroup.LayoutParams.WRAP_CONTENT
         )
         dialog.show()
@@ -1032,6 +1102,10 @@ class MainActivity : AppCompatActivity(), BluetoothHidManager.HidStateListener, 
 
         btnGlobalKeyboardClose.setOnClickListener {
             globalKeyboardOverlay.visibility = android.view.View.GONE
+        }
+
+        btnNumLock.setOnClickListener {
+            btService?.hidManager?.sendNumLockToggle()
         }
 
         // Standard QWERTY key scancode map for global keyboard keys
@@ -1342,11 +1416,17 @@ class MainActivity : AppCompatActivity(), BluetoothHidManager.HidStateListener, 
 
     override fun onDestroy() {
         if (isExiting) {
+            if (::winInstallServer.isInitialized) {
+                winInstallServer.stop()
+            }
             super.onDestroy()
             return
         }
         isManualDisconnect = true
         stopReconnectLoop()
+        if (::winInstallServer.isInitialized) {
+            winInstallServer.stop()
+        }
         super.onDestroy()
         // Restore A2DP profiles before disconnect
         btService?.hidManager?.restoreA2dpAndRestartBt()

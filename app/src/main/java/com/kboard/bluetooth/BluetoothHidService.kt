@@ -24,6 +24,8 @@ class BluetoothHidService : Service() {
     companion object {
         private const val CHANNEL_ID = "kboard_bt_channel"
         private const val NOTIFICATION_ID = 2026
+        const val ACTION_TEST_WIN_HEX = "com.kboard.action.TEST_WIN_HEX"
+        const val EXTRA_TEST_TEXT = "test_text"
     }
 
     inner class LocalBinder : Binder() {
@@ -120,6 +122,11 @@ class BluetoothHidService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (intent?.action == ACTION_TEST_WIN_HEX) {
+            val text = intent.getStringExtra(EXTRA_TEST_TEXT) ?: "你好"
+            Log.d("BluetoothHidService", "ADB HID speed test: '$text'")
+            hidManager?.sendUnicodeString(text, BluetoothHidManager.MODE_WIN)
+        }
         return START_STICKY
     }
 

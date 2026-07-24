@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="320dp"
+    android:layout_width="match_parent"
+    android:layout_marginLeft="16dp"
+    android:layout_marginRight="16dp"
     android:layout_height="wrap_content"
     android:orientation="vertical"
     android:background="@drawable/dialog_glass_bg"
@@ -10,7 +12,7 @@
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Windows 电脑注册表配置指南"
+        android:text="Windows U+ 助手安装说明"
         android:textColor="#00ADB5"
         android:textSize="15sp"
         android:textStyle="bold"
@@ -24,9 +26,10 @@
         android:layout_marginBottom="8dp" />
 
     <TextView
+        android:id="@+id/tvWinGuideContent"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="1. 按【Win + R】键打开运行，输入 regedit 打开注册表。\n\n2. 导航至以下路径：\n   HKEY_CURRENT_USER\\Control Panel\\Input Method\n\n3. 在右侧空白处右键 -> 新建 -> 【字符串值】，并命名为：EnableHexNumpad\n\n4. 双击 EnableHexNumpad，将数值数据设置为【1】并确定。\n\n5. 【特别注意】设置完成后，必须注销当前用户重新登录，或者重启电脑才能生效！\n\n6. 【输入法状态】Win直投输入时，请务必保持 Windows 电脑处于【英文输入状态】（如按 Shift 切换为 EN / 英文），以防止中文输入法弹窗拦截字符。"
+        android:text="正在启动安装服务..."
         android:textColor="#EEEEEE"
         android:textSize="12sp"
         android:lineSpacingMultiplier="1.15" />

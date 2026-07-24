@@ -2,9 +2,16 @@ package com.kboard.bluetooth
 
 import android.annotation.SuppressLint
 import android.bluetooth.*
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
+import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
 @SuppressLint("MissingPermission")
 class BluetoothHidManager(private val context: Context, var listener: HidStateListener?) {
@@ -14,6 +21,7 @@ class BluetoothHidManager(private val context: Context, var listener: HidStateLi
         fun onAppRegistered(registered: Boolean)
         fun onLog(message: String)
         fun onBtRestartState(isRestarting: Boolean) {}
+        fun onNumLockStateChanged(isOn: Boolean) {}  // NumLock LED 状态变化
     }
 
     companion object {
@@ -31,6 +39,8 @@ class BluetoothHidManager(private val context: Context, var listener: HidStateLi
         private const val A2DP_DYNAMIC_PROP = "persist.sys_im.blutooth.is_a2dp_dynamic"
 
         // Standard Keyboard + Mouse HID Report Descriptor
+        // Keypad keys (including Keypad+ 0x57) are part of Usage Page 0x07
+        // and are already covered by the keyboard array's 0x00..0x65 range.
         private val HID_DESCRIPTOR = byteArrayOf(
             // Keyboard Report Descriptor
             0x05.toByte(), 0x01.toByte(),        // Usage Page (Generic Desktop Ctrls)
@@ -120,9 +130,37 @@ class BluetoothHidManager(private val context: Context, var listener: HidStateLi
     @Volatile
     private var isBtResetting = false  // true during clear/reset to suppress transient failure UI
 
+    // NumLock LED 状态
+    @Volatile
+    var isNumLockOn = false
+        private set
+
+    // NumLock 主动查询：0=idle, 1=等待LED报告, 2=等待还原确认
+    @Volatile
+    private var numLockQueryPhase = 0
+    private val queryHandler = Handler(Looper.getMainLooper())
+    private var queryTimeoutRunnable: Runnable? = null
+
     private val executor = Executors.newSingleThreadExecutor()
 
+    // 监听蓝牙开关状态广播，替代 polling sleep
+    private var btStateReceiver: BroadcastReceiver? = null
+    @Volatile
+    private var btStateLatch: CountDownLatch? = null
+
     init {
+        // 注册蓝牙状态广播
+        val filter = IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED)
+        btStateReceiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context?, intent: Intent?) {
+                val state = intent?.getIntExtra(BluetoothAdapter.EXTRA_STATE, -1) ?: -1
+                val prev = intent?.getIntExtra(BluetoothAdapter.EXTRA_PREVIOUS_STATE, -1) ?: -1
+                Log.d(TAG, "BT State: $prev → $state")
+                btStateLatch?.countDown()
+            }
+        }
+        context.registerReceiver(btStateReceiver, filter)
+
         // Step 1: MUST set dynamic switch BEFORE writing disabled_profiles (per a2dp.md)
         try {
             val sp = Class.forName("android.os.SystemProperties")
@@ -138,6 +176,25 @@ class BluetoothHidManager(private val context: Context, var listener: HidStateLi
 
         // Step 3: Init HID profile proxy (NO BT restart on enter)
         initProfileProxy()
+    }
+
+    /** 等待蓝牙到达指定状态（事件驱动，不轮询） */
+    private fun waitForBtState(targetState: Int, timeoutSec: Long = 10): Boolean {
+        val adapter = bluetoothAdapter ?: return false
+        if (adapter.state == targetState) return true  // 已经到达
+        btStateLatch = CountDownLatch(1)
+        return try {
+            btStateLatch?.await(timeoutSec, TimeUnit.SECONDS) ?: false
+        } catch (e: InterruptedException) {
+            false
+        } finally {
+            btStateLatch = null
+        }
+    }
+
+    fun destroy() {
+        btStateReceiver?.let { context.unregisterReceiver(it) }
+        btStateReceiver = null
     }
 
     fun enforceSystemHidOnlyConfiguration() {
@@ -195,15 +252,15 @@ class BluetoothHidManager(private val context: Context, var listener: HidStateLi
                 listener?.onBtRestartState(true)
                 if (isAppRegistered) { try { hidDevice?.unregisterApp() } catch (_: Exception) {}; isAppRegistered = false }
 
-                // BT OFF
+                // BT OFF → 等 STATE_OFF 广播
                 Log.d(TAG, "BT OFF..."); adapter.disable()
-                var r = 0; while (adapter.state != BluetoothAdapter.STATE_OFF && r < 30) { Thread.sleep(200); r++ }
-                Log.d(TAG, "BT OFF done (state=${adapter.state})"); Thread.sleep(800)
+                val offOk = waitForBtState(BluetoothAdapter.STATE_OFF, 10)
+                Log.d(TAG, "BT OFF done (ok=$offOk, state=${adapter.state})")
 
-                // BT ON (NO force-stop!)
+                // BT ON → 等 STATE_ON 广播
                 Log.d(TAG, "BT ON..."); adapter.enable()
-                r = 0; while (adapter.state != BluetoothAdapter.STATE_ON && r < 30) { Thread.sleep(200); r++ }
-                Log.d(TAG, "BT ON done (state=${adapter.state})"); Thread.sleep(1500)
+                val onOk = waitForBtState(BluetoothAdapter.STATE_ON, 10)
+                Log.d(TAG, "BT ON done (ok=$onOk, state=${adapter.state})")
 
                 enforceSystemHidOnlyConfiguration()
                 initProfileProxy()
@@ -276,25 +333,22 @@ class BluetoothHidManager(private val context: Context, var listener: HidStateLi
         executor.execute {
             try {
                 listener?.onBtRestartState(true)
-                listener?.onLog("Soft-restarting Bluetooth adapter to clear memory stack...")
+                listener?.onLog("Soft-restarting Bluetooth adapter...")
                 if (isAppRegistered) {
                     try { hidDevice?.unregisterApp() } catch (e: Exception) {}
                     isAppRegistered = false
                 }
+
+                // BT OFF → 等广播
                 adapter.disable()
-                var retries = 0
-                while (adapter.state != BluetoothAdapter.STATE_OFF && retries < 25) {
-                    Thread.sleep(200)
-                    retries++
-                }
-                Thread.sleep(600)
+                waitForBtState(BluetoothAdapter.STATE_OFF, 10)
+                Log.d(TAG, "Soft restart: BT OFF confirmed, enabling...")
+
+                // BT ON → 等广播
                 adapter.enable()
-                retries = 0
-                while (adapter.state != BluetoothAdapter.STATE_ON && retries < 25) {
-                    Thread.sleep(200)
-                    retries++
-                }
-                Thread.sleep(800)
+                waitForBtState(BluetoothAdapter.STATE_ON, 10)
+                Log.d(TAG, "Soft restart: BT ON confirmed, reinitializing...")
+
                 enforceSystemHidOnlyConfiguration()
                 initProfileProxy()
                 listener?.onBtRestartState(false)
@@ -313,29 +367,47 @@ class BluetoothHidManager(private val context: Context, var listener: HidStateLi
         // Set local device class to Keyboard/Mouse Peripheral (0x0025C0)
         setLocalBluetoothClassToKeyboardMouse()
 
-        // Clean up any orphaned registration from previous runs
-        try {
-            hid.unregisterApp()
-            listener?.onLog("Unregistered any previous HID App registration to avoid conflicts")
-        } catch (e: Exception) {
-            // ignore
-        }
+        // 整个注册流程移到后台，不阻塞主线程（避免 Bluetooth 服务初始化卡死）
+        executor.execute {
+            // Clean up any orphaned registration from previous runs
+            try {
+                hid.unregisterApp()
+                listener?.onLog("Unregistered any previous HID App registration to avoid conflicts")
+            } catch (e: Exception) {
+                // ignore
+            }
 
-        // Wait briefly for the Bluetooth stack to unregister
-        try {
-            Thread.sleep(200)
-        } catch (e: InterruptedException) {
-            // ignore
-        }
+            // Wait briefly for the Bluetooth stack to unregister
+            try {
+                Thread.sleep(500)
+            } catch (e: InterruptedException) {
+                // ignore
+            }
 
-        val sdpSettings = BluetoothHidDeviceAppSdpSettings(
-            "kboard",
-            "Virtual HID Keyboard",
-            "Google Antigravity",
-            0x40.toByte(), // Keyboard subclass (enforces Keyboard device classification)
-            HID_DESCRIPTOR
-        )
-        val callback = object : BluetoothHidDevice.Callback() {
+            val sdpSettings = BluetoothHidDeviceAppSdpSettings(
+                "kboard",
+                "Virtual HID Keyboard",
+                "Google Antigravity",
+                0x40.toByte(),
+                HID_DESCRIPTOR
+            )
+            val callback = createHidCallback()
+            
+            var success = hid.registerApp(sdpSettings, null, null, executor, callback)
+            if (!success) {
+                listener?.onLog("Failed to register HID App, retrying in 1s...")
+                try { Thread.sleep(1000) } catch (_: Exception) {}
+                success = hid.registerApp(sdpSettings, null, null, executor, callback)
+                if (!success) {
+                    listener?.onLog("Failed to register HID App (2nd attempt)")
+                }
+            }
+        }
+    }
+    
+    /** 提取 HID callback 创建，避免 registerHidApp 过长 */
+    private fun createHidCallback(): BluetoothHidDevice.Callback {
+        return object : BluetoothHidDevice.Callback() {
             override fun onAppStatusChanged(device: BluetoothDevice?, registered: Boolean) {
                 super.onAppStatusChanged(device, registered)
                 isAppRegistered = registered
@@ -359,9 +431,10 @@ class BluetoothHidManager(private val context: Context, var listener: HidStateLi
                         val prefs = context.getSharedPreferences("kboard_prefs", Context.MODE_PRIVATE)
                         prefs.edit().putString("last_connected_device", address).apply()
                     }
-                    // Connected: switch to CONNECTABLE only (not discoverable to other hosts)
-                    setScanMode(21)  // SCAN_MODE_CONNECTABLE
-                    Log.d(TAG, "ScanMode set to CONNECTABLE (21) — device is connected, hidden from other hosts")
+                    setScanMode(21)
+                    Log.d(TAG, "ScanMode set to CONNECTABLE (21)")
+                    // 主动查询 NumLock：发一次 NumLock → 读 LED → 再发一次还原
+                    scheduleNumLockQuery()
                 } else if (state == BluetoothProfile.STATE_DISCONNECTED) {
                     connectedDevice = null
                     // Disconnected: restore discoverable mode so other hosts can find us
@@ -380,7 +453,53 @@ class BluetoothHidManager(private val context: Context, var listener: HidStateLi
 
             override fun onSetReport(device: BluetoothDevice?, type: Byte, id: Byte, data: ByteArray?) {
                 super.onSetReport(device, type, id, data)
-                Log.d(TAG, "onSetReport: type=$type id=$id data=${data?.contentToString()}")
+                val hex = data?.joinToString(" ") { String.format("%02X", it) } ?: "null"
+                Log.d(TAG, "onSetReport: type=$type (${if(type==BluetoothHidDevice.REPORT_TYPE_OUTPUT) "OUTPUT" else if(type==BluetoothHidDevice.REPORT_TYPE_INPUT) "INPUT" else "FEATURE"}), id=$id, data=[$hex]")
+                // 解析 OUTPUT 报告（type=2）：LED 状态字节
+                if (type == BluetoothHidDevice.REPORT_TYPE_OUTPUT &&
+                    id.toInt() == REPORT_ID_KEYBOARD &&
+                    data != null && data.size == 1
+                ) {
+                    val reportedNumLock = (data[0].toInt() and 1) != 0
+                    Log.d(TAG, "NumLock LED from host: $reportedNumLock (data=0x${String.format("%02X", data[0])}) phase=$numLockQueryPhase")
+                    
+                    if (numLockQueryPhase == 1) {
+                        // 查询阶段1：收到了第一次toggle后的LED状态
+                        // 主机报告的 = 被我们toggle后的新状态 → 原始状态 = !reportedNumLock
+                        val originalState = !reportedNumLock
+                        isNumLockOn = originalState
+                        listener?.onNumLockStateChanged(isNumLockOn)
+                        Log.d(TAG, "NumLock query: reported=$reportedNumLock → original=$originalState, restoring...")
+                        
+                        // 发第二次 NumLock 还原
+                        numLockQueryPhase = 2
+                        queryTimeoutRunnable?.let { queryHandler.removeCallbacks(it) }
+                        executor.execute {
+                            sendKeyboardReport(0, byteArrayOf(0x53))
+                            try { Thread.sleep(80) } catch (_: Exception) {}
+                            sendKeyboardReport(0, byteArrayOf())
+                            Log.d(TAG, "NumLock query: restore toggle sent")
+                        }
+                        // 等还原的 LED 确认
+                        queryTimeoutRunnable = Runnable {
+                            Log.w(TAG, "NumLock query: restore timeout")
+                            numLockQueryPhase = 0
+                        }
+                        queryHandler.postDelayed(queryTimeoutRunnable!!, 2000)
+                    } else if (numLockQueryPhase == 2) {
+                        // 查询阶段2：收到了还原toggle后的LED确认
+                        // 理论上 reportedNumLock 应该 == originalState（已还原）
+                        Log.d(TAG, "NumLock query: restore confirmed, reported=$reportedNumLock, local=$isNumLockOn")
+                        numLockQueryPhase = 0
+                        queryTimeoutRunnable?.let { queryHandler.removeCallbacks(it) }
+                    } else {
+                        // 非查询状态下的正常 LED 更新
+                        if (reportedNumLock != isNumLockOn) {
+                            isNumLockOn = reportedNumLock
+                            listener?.onNumLockStateChanged(isNumLockOn)
+                        }
+                    }
+                }
             }
 
             override fun onVirtualCableUnplug(device: BluetoothDevice?) {
@@ -389,11 +508,6 @@ class BluetoothHidManager(private val context: Context, var listener: HidStateLi
                 connectedDevice = null
                 listener?.onConnectionStateChanged(device, BluetoothProfile.STATE_DISCONNECTED)
             }
-        }
-
-        val success = hid.registerApp(sdpSettings, null, null, executor, callback)
-        if (!success) {
-            listener?.onLog("Failed to register HID App")
         }
     }
 
@@ -563,6 +677,53 @@ class BluetoothHidManager(private val context: Context, var listener: HidStateLi
         }
     }
 
+    /** 手动发送 NumLock 键，纯本地状态跟踪（onSetReport 不工作，无法从主机读取 LED） */
+    fun sendNumLockToggle() {
+        // 如果正在查询中，忽略手动操作
+        if (numLockQueryPhase != 0) {
+            Log.d(TAG, "NumLock toggle ignored: query in progress (phase=$numLockQueryPhase)")
+            return
+        }
+        isNumLockOn = !isNumLockOn
+        listener?.onNumLockStateChanged(isNumLockOn)
+        Log.d(TAG, "NumLock toggle: local=$isNumLockOn")
+        executor.execute {
+            sendKeyboardReport(0, byteArrayOf(0x53))
+            try { Thread.sleep(80) } catch (_: Exception) {}
+            sendKeyboardReport(0, byteArrayOf())
+        }
+    }
+
+    /** 连接后主动查询 NumLock：发NumLock → 等LED → 发NumLock还原 */
+    private fun scheduleNumLockQuery() {
+        if (numLockQueryPhase != 0) return  // 已在查询中
+        queryHandler.postDelayed({
+            if (connectedDevice == null) return@postDelayed  // 已断开
+            numLockQueryPhase = 1
+            Log.d(TAG, "NumLock query: phase 1 — sending toggle...")
+            // 发送 NumLock（第一次）
+            executor.execute {
+                sendKeyboardReport(0, byteArrayOf(0x53))
+                try { Thread.sleep(80) } catch (_: Exception) {}
+                sendKeyboardReport(0, byteArrayOf())
+                Log.d(TAG, "NumLock query: toggle sent, waiting for LED report...")
+            }
+            // 超时保护：3秒内没收到 LED 报告，发一次还原并放弃
+            queryTimeoutRunnable = Runnable {
+                if (numLockQueryPhase == 1 || numLockQueryPhase == 2) {
+                    Log.w(TAG, "NumLock query: timeout, restoring blindly...")
+                    executor.execute {
+                        sendKeyboardReport(0, byteArrayOf(0x53))
+                        try { Thread.sleep(80) } catch (_: Exception) {}
+                        sendKeyboardReport(0, byteArrayOf())
+                    }
+                    numLockQueryPhase = 0
+                }
+            }
+            queryHandler.postDelayed(queryTimeoutRunnable!!, 3000)
+        }, 800)  // 等连接稳定 800ms 后再查询
+    }
+
     fun clearAllPairsAndDisconnect() {
         val adapter = bluetoothAdapter ?: return
         val hid = hidDevice
@@ -622,19 +783,18 @@ class BluetoothHidManager(private val context: Context, var listener: HidStateLi
                 isBtResetting = true
                 listener?.onBtRestartState(true)
                 listener?.onLog("Restarting Bluetooth stack to reload clean HID-only SDP records...")
+
+                // BT OFF → 等广播
                 adapter.disable()
-                var retries = 0
-                while (adapter.state != BluetoothAdapter.STATE_OFF && retries < 20) {
-                    Thread.sleep(200)
-                    retries++
-                }
-                Thread.sleep(500)
+                waitForBtState(BluetoothAdapter.STATE_OFF, 10)
+
+                // BT ON → 等广播
                 adapter.enable()
-                Thread.sleep(200)  // let BT stack stabilize
-                // Re-register HID app after BT restart so device is discoverable
+                waitForBtState(BluetoothAdapter.STATE_ON, 10)
+
                 enforceSystemHidOnlyConfiguration()
                 initProfileProxy()
-                listener?.onLog("Bluetooth stack restarted. HID re-registered. Device is discoverable as keyboard+mouse.")
+                listener?.onLog("Bluetooth stack restarted. HID re-registered.")
                 // isBtResetting=false + onBtRestartState(false) handled in onServiceConnected
             } catch (e: Exception) {
                 Log.e(TAG, "Error restarting bluetooth adapter", e)
@@ -675,8 +835,14 @@ class BluetoothHidManager(private val context: Context, var listener: HidStateLi
     // data[1] -> reserved (0)
     // data[2..7] -> 6 keycodes (array of up to 6 keycodes currently pressed)
     fun sendKeyboardReport(modifiers: Byte, keycodes: ByteArray) {
-        val hid = hidDevice ?: return
-        val device = connectedDevice ?: return
+        val hid = hidDevice ?: run {
+            Log.e(TAG, "KB RPT SKIP: hidDevice=null mod=0x${modifiers.toString(16)} keys=${keycodes.map { String.format("0x%02X", it) }}")
+            return
+        }
+        val device = connectedDevice ?: run {
+            Log.e(TAG, "KB RPT SKIP: connectedDevice=null mod=0x${modifiers.toString(16)} keys=${keycodes.map { String.format("0x%02X", it) }}")
+            return
+        }
         val reportData = ByteArray(8)
         reportData[0] = modifiers
         reportData[1] = 0 // Reserved
@@ -685,7 +851,9 @@ class BluetoothHidManager(private val context: Context, var listener: HidStateLi
         }
         val success = hid.sendReport(device, REPORT_ID_KEYBOARD, reportData)
         if (!success) {
-            Log.e(TAG, "Failed to send keyboard report")
+            Log.e(TAG, "KB RPT FAIL: mod=0x${modifiers.toString(16)} keys=${keycodes.map { String.format("0x%02X", it) }} report=[${reportData.joinToString { String.format("%02X", it) }}]")
+        } else {
+            Log.v(TAG, "KB RPT OK:  mod=0x${modifiers.toString(16)} keys=${keycodes.map { String.format("0x%02X", it) }}")
         }
     }
 
@@ -763,38 +931,60 @@ class BluetoothHidManager(private val context: Context, var listener: HidStateLi
         try { Thread.sleep(10) } catch (e: Exception) {}
     }
 
-    // Sends a Unicode character on Windows using Alt + Numpad+ + Hex (requires EnableHexNumpad=1)
-    // Alt must be held continuously; standard letter keys (a-f) are accepted by Windows hex input
+    // ===================================================================
+    // Windows Unicode 输入：Alt + Keypad+ + Hex（EnableHexNumpad=1 标准方式）
+    //
+    // 前提：Windows 注册表 HKCU\Control Panel\Input Method\EnableHexNumpad=1 (REG_SZ)
+    //
+    // 序列：NumLock ON → 按住 Alt → 按 Keypad+ → 松开 Keypad+ → 输入 4 位 hex
+    //        → 松开 Alt → NumLock 还原
+    //
+    // hex 0-9、a-f 均使用主键盘键码；Windows 接收器负责拦截并转换 Unicode。
+    // ===================================================================
+    private var winUniFailCount = 0
+    private var winUniTotalCount = 0
+    private val winHexModifierDelayMs = 3L
+    private val winHexKeyDelayMs = 5L
+    private val winHexCommitDelayMs = 5L
+
     private fun sendUnicodeCharacterWin(char: Char) {
-        val hex = char.code.toString(16).padStart(4, '0').lowercase()  // e.g. "4e2d"
-        val altMod: Byte = 0x04
-        
-        // 1. Hold Alt + press Numpad+ to start hex input
-        sendKeyboardReport(altMod, byteArrayOf())
-        try { Thread.sleep(15) } catch (_: Exception) {}
-        sendKeyboardReport(altMod, byteArrayOf(0x57))  // Keypad +
-        try { Thread.sleep(15) } catch (_: Exception) {}
-        sendKeyboardReport(altMod, byteArrayOf())       // release +, keep Alt
-        try { Thread.sleep(15) } catch (_: Exception) {}
-        
-        // 2. Type hex digits (standard keys for a-f, numpad keys for 0-9)
+        val hex = char.code.toString(16).padStart(4, '0')  // e.g. "4f60"
+        winUniTotalCount++
+        Log.d(TAG, "WIN-HEX: char=U+${hex.uppercase()}('$char') hex=$hex")
+
+        val altMod: Byte = 0x04   // Left Alt
+
+        // === 1. 按住 Alt + 按 Keypad+ 进入 hex 模式 ===
+        sendKeyboardReport(altMod, byteArrayOf())           // 按住 Alt
+        try { Thread.sleep(winHexModifierDelayMs) } catch (_: Exception) {}
+        sendKeyboardReport(altMod, byteArrayOf(0x57))       // Keypad +
+        try { Thread.sleep(winHexKeyDelayMs) } catch (_: Exception) {}
+
+        // === 2. 使用主键盘输入 4 位 hex ===
+        // 相邻不同键直接切换报告，上一键会随报告自动释放；只有连续相同
+        // hex 位才插入空报告，避免 Windows 将其视为一次长按。
+        var previousSc: Byte? = null
         for (ch in hex) {
-            val sc = when (ch) {
-                '0' -> 0x62  // Keypad 0
-                in '1'..'9' -> 0x59 + (ch - '1')  // Keypad 1-9
-                'a' -> 0x04; 'b' -> 0x05; 'c' -> 0x06  // standard keys for hex a-f
-                'd' -> 0x07; 'e' -> 0x08; 'f' -> 0x09
+            val sc: Byte = when (ch) {
+                '0' -> 0x27
+                in '1'..'9' -> (0x1E + (ch - '1')).toByte()
+                in 'a'..'f' -> (0x04 + (ch - 'a')).toByte()
                 else -> continue
             }
-            sendKeyboardReport(altMod, byteArrayOf(sc.toByte()))
-            try { Thread.sleep(10) } catch (_: Exception) {}
-            sendKeyboardReport(altMod, byteArrayOf())  // release key, keep Alt
-            try { Thread.sleep(10) } catch (_: Exception) {}
+            if (sc == previousSc) {
+                sendKeyboardReport(altMod, byteArrayOf())
+                try { Thread.sleep(winHexKeyDelayMs) } catch (_: Exception) {}
+            }
+            sendKeyboardReport(altMod, byteArrayOf(sc))
+            try { Thread.sleep(winHexKeyDelayMs) } catch (_: Exception) {}
+            previousSc = sc
         }
-        
-        // 3. Release Alt to commit the character
+
+        // === 3. 同时释放最后一个 hex 键和 Alt，提交字符 ===
         sendKeyboardReport(0, byteArrayOf())
-        try { Thread.sleep(15) } catch (_: Exception) {}
+        try { Thread.sleep(winHexCommitDelayMs) } catch (_: Exception) {}
+
+        Log.d(TAG, "WIN-HEX DONE: U+${hex.uppercase()} hex=$hex total=$winUniTotalCount fail=$winUniFailCount")
     }
 
     // Sends a Unicode string by splitting ASCII and Unicode characters

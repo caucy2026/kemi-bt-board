@@ -247,7 +247,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="28dp"
                     android:background="@drawable/button_mac_helper"
-                    android:text="如何设置 EnableHexNumpad=1"
+                    android:text="如何安装 Windows U+ 助手"
                     android:textColor="@color/white"
                     android:textSize="10sp"
                     android:paddingLeft="12dp"
@@ -808,6 +808,31 @@
                 <Button android:id="@+id/btnGCmdR" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1.6" android:layout_marginStart="2dp" android:text="COMMAND" style="@style/QwertyKeyStyle" />
                 <Button android:id="@+id/btnGOptR" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1.2" android:layout_marginStart="2dp" android:text="OPTION" style="@style/QwertyKeyStyle" />
                 <Button android:id="@+id/btnGCtrlR" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1.2" android:layout_marginStart="2dp" android:text="CTRL" style="@style/QwertyKeyStyle" />
+
+                <!-- NumLock 按钮 + 指示灯 -->
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1.2"
+                    android:layout_marginStart="4dp"
+                    android:orientation="horizontal"
+                    android:gravity="center">
+                    <View
+                        android:id="@+id/numLockIndicator"
+                        android:layout_width="16dp"
+                        android:layout_height="16dp" />
+                    <Button
+                        android:id="@+id/btnNumLock"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_weight="1"
+                        android:layout_marginStart="2dp"
+                        android:text="NUM&#10;LOCK"
+                        android:textSize="8sp"
+                        android:lines="2"
+                        style="@style/QwertyKeyStyle" />
+                </LinearLayout>
+
                 <Button android:id="@+id/btnGLeft" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1.0" android:layout_marginStart="6dp" android:text="←" style="@style/QwertyKeyStyle" />
                 <LinearLayout
                     android:layout_width="0dp"

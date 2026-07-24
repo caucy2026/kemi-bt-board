@@ -2,15 +2,15 @@
 
 **KEMI 语音智能键盘 (kemi-bt-board)** 是一款运行在 Android 设备上的蓝牙外设模拟工具。它通过 Android 系统的蓝牙 HID (Human Interface Device) 协议，将 Android 设备直接模拟为**标准的物理蓝牙键盘和鼠标触摸板**。
 
-项目的核心价值在于：**在接收端主机（如 Mac, Windows）不需要安装任何额外的接收软件或 Agent 的情况下，利用 Android 端的高精准本地语音识别（ASR）直接极速向主机直投输入中文字符。**
+项目通过 Android 端的高精准本地语音识别（ASR）向主机直投中文：macOS 使用系统内置 Unicode 输入法，Windows 使用项目附带的轻量接收器拦截 HID 十六进制序列并输出 Unicode。
 
 ---
 
 ## 🌟 核心特色与功能
 
-1. **零依赖免驱直投 (Zero-Dependency Direct Input)**:
+1. **标准 HID 直投 (Standard HID Direct Input)**:
    * **macOS 模式 (Option Hex Input)**: 利用 macOS 系统内置的“Unicode 十六进制输入”输入法，长按 Option + 录入 Hex 编码，实现高精准免驱中文录入。
-   * **Windows 模式 (Alt Numpad Hex Input)**: 利用 Windows 系统的 `EnableHexNumpad` 机制进行录入。
+   * **Windows 模式 (Alt Numpad Hex Input)**: Android 发送标准 `Alt + Numpad+ + Hex` 序列，配套 `WinUnicodeIME.exe` 负责阻止 A-F 被应用菜单抢占并输出 Unicode。
    * **拼音模式**: 转换中文为拼音码并空格提交，实现通用设备打字回退兼容。
 2. **极速传输响应**:
    * 精确的微秒级时钟微调，普通按键延时 **`5ms`**，控制修饰键延时 **`8ms`**。单字直投耗时仅约 **`40ms`**，说话松开即瞬间完成输入。
@@ -35,11 +35,17 @@
 2. 点击 **`+`** 号，在左侧选择列表的最下方找到 **“其它 (Others)”**，添加并启用 **“Unicode 十六进制输入 (Unicode Hex Input)”**。
 3. 在需要输入中文时，将 macOS 输入法切换为 **`[U+]`** 标志的状态，即可开始语音输入。
 
-### 2. Windows 接收端配置
-1. 按 `Win + R` 键，输入 `regedit` 打开注册表编辑器。
-2. 导航至 `HKEY_CURRENT_USER\Control Panel\Input Method`。
-3. 在右侧空白处右键 -> 新建 -> **字符串值 (String Value)**，命名为 **`EnableHexNumpad`**，将其值设置为 **`1`**。
-4. **重启电脑**使配置生效，之后即可开始直投。
+### 2. Windows 接收端配置（v1.1.2 新方案）
+
+**无需提前准备文件——App 内置安装服务，同网络即可完成。**
+
+1. 在 Android App 中切换到 **Win 直投** 模式，后台自动启动安装服务（端口 8686）。
+2. 点击「如何安装 Windows U+ 助手」查看访问地址（如 `http://192.168.x.x:8686`）。
+3. 确保 Windows 与手机在同一局域网，浏览器输入该地址。
+4. 下载 **install.bat** → 双击运行，自动完成：下载 EXE → 注册开机自启 → 启动助手。
+5. 助手在系统托盘运行后，回到 App 的 Win 直投模式即可输入中文。
+
+> 旧方案（手动复制 EXE + 注册表 EnableHexNumpad）仍可用，但推荐新方案更简单可靠。
 
 ---
 
@@ -64,3 +70,31 @@ build.bat
 ```
 编译成功后，生成的 APK 将输出在：
 `app/build/outputs/apk/release/app-release.apk`
+
+---
+
+## 📋 版本记录
+
+### v1.1.2 (2026-07-24)
+- **Windows U+ 助手一键安装**：App 内置 HTTP 服务（固定端口 8686），同局域网浏览器访问即可下载安装
+- **install.bat 方案**：下载双击自动完成 EXE 安装 + 开机自启注册，避免 PowerShell 脚本转义/执行策略问题
+- **安装说明页重设计**：三选一安装方式（bat / EXE / ps1），Wi-Fi 名称和地址实时显示
+- **切 Win 直投自动启动后台服务**，无需额外操作
+- 修复 install.ps1 右键运行闪退（Mark of the Web + 执行策略 + `$` 变量展开）
+- 修复 EXE 二进制下载 BufferedOutputStream 截断问题
+- 安装页添加局域网 HTTP 安全提示
+
+### v1.1.0
+- 修复动画/ASR重构/蓝牙优化
+
+### v1.0.45-46
+- 清除连接重注册HID+连接时隐藏设备(setScanMode)
+
+### v1.0.44
+- A2DP终版: SystemProperties.set+putInt(2052), 不重启蓝牙, 退出写2048
+
+### v1.0.41
+- 清除连接时不显示失败+reset加转圈+isBtResetting提前屏蔽
+
+### v1.0.40
+- A2DP音频关闭 + BT重启动画 + 退出键盘按钮 + 完整文档

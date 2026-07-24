@@ -5,7 +5,11 @@
 			"label": "Scan Bluetooth via CMD",
 			"type": "shell",
 			"command": "cmd",
-			"args": ["/c", "python", "D:\\work\\ai_code\\kemi-bt-board\\scratch\\bt_scan_v2.py"],
+			"args": [
+				"/c",
+				"python",
+				"D:\\work\\ai_code\\kemi-bt-board\\scratch\\bt_scan_v2.py"
+			],
 			"problemMatcher": [],
 			"group": "none"
 		},
@@ -13,9 +17,19 @@
 			"label": "Check BT via CMD",
 			"type": "shell",
 			"command": "cmd",
-			"args": ["/c", "echo Bluetooth devices: && pnputil /enum-devices /class Bluetooth"],
+			"args": [
+				"/c",
+				"echo Bluetooth devices: && pnputil /enum-devices /class Bluetooth"
+			],
 			"problemMatcher": [],
 			"group": "none"
+		},
+		{
+			"label": "Build v1.1.1",
+			"type": "shell",
+			"command": "${env:JAVA_HOME}\\bin\\java.exe -classpath gradle\\wrapper\\gradle-wrapper.jar org.gradle.wrapper.GradleWrapperMain assembleRelease --no-daemon -p ${workspaceFolder}",
+			"problemMatcher": [],
+			"group": "build"
 		}
 	]
 }
